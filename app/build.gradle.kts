@@ -24,21 +24,26 @@ android {
 
   signingConfigs {
     create("release") {
-      val envPath = System.getenv("SIGNING_KEYSTORE_PATH") ?: System.getenv("KEYSTORE_PATH")
-      if (!envPath.isNullOrEmpty() && file(envPath).exists()) {
-        storeFile = file(envPath)
-        storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "1234567q"
-        keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "musicx_alias"
-        keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "1234567q"
+      val keystorePath = System.getenv("KEYSTORE_FILE")
+        ?: System.getenv("SIGNING_KEYSTORE_PATH")
+        ?: System.getenv("KEYSTORE_PATH")
+
+      if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
+        storeFile = file(keystorePath)
+        storePassword = System.getenv("KEYSTORE_PASSWORD")
+          ?: System.getenv("SIGNING_KEYSTORE_PASSWORD")
+          ?: System.getenv("STORE_PASSWORD")
+        keyAlias = System.getenv("KEY_ALIAS") ?: System.getenv("SIGNING_KEY_ALIAS")
+        keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("SIGNING_KEY_PASSWORD")
       } else if (file("${rootDir}/release.jks").exists()) {
         storeFile = file("${rootDir}/release.jks")
-        storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD") ?: "1234567q"
-        keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "musicx_alias"
-        keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: "1234567q"
+        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("SIGNING_KEYSTORE_PASSWORD") ?: "1234567q"
+        keyAlias = System.getenv("KEY_ALIAS") ?: System.getenv("SIGNING_KEY_ALIAS") ?: "musicx_alias"
+        keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("SIGNING_KEY_PASSWORD") ?: "1234567q"
       } else {
-        val keystorePath = envPath ?: "${rootDir}/my-upload-key.jks"
-        storeFile = file(keystorePath)
-        storePassword = System.getenv("STORE_PASSWORD") ?: "1234567q"
+        val defaultPath = keystorePath ?: "${rootDir}/my-upload-key.jks"
+        storeFile = file(defaultPath)
+        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "1234567q"
         keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
         keyPassword = System.getenv("KEY_PASSWORD") ?: "1234567q"
       }

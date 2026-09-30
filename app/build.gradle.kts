@@ -24,30 +24,34 @@ android {
 
   signingConfigs {
     create("release") {
+      val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
       val keystorePath = System.getenv("KEYSTORE_FILE")
-        ?: System.getenv("SIGNING_KEYSTORE_PATH")
-        ?: System.getenv("KEYSTORE_PATH")
 
-      if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
-        storeFile = file(keystorePath)
+      if (isReleaseTask || keystorePath != null) {
+        val resolvedPath = keystorePath
+          ?: throw GradleException("KEYSTORE_FILE is not set")
+
+        val keystoreFile = file(resolvedPath)
+
+        if (!keystoreFile.exists()) {
+          throw GradleException("Keystore not found: $resolvedPath")
+        }
+
+        storeFile = keystoreFile
         storePassword = System.getenv("KEYSTORE_PASSWORD")
-          ?: System.getenv("SIGNING_KEYSTORE_PASSWORD")
-          ?: System.getenv("STORE_PASSWORD")
-        keyAlias = System.getenv("KEY_ALIAS") ?: System.getenv("SIGNING_KEY_ALIAS")
-        keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("SIGNING_KEY_PASSWORD")
-      } else if (file("${rootDir}/release.jks").exists()) {
-        storeFile = file("${rootDir}/release.jks")
-        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("SIGNING_KEYSTORE_PASSWORD") ?: "1234567q"
-        keyAlias = System.getenv("KEY_ALIAS") ?: System.getenv("SIGNING_KEY_ALIAS") ?: "musicx_alias"
-        keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("SIGNING_KEY_PASSWORD") ?: "1234567q"
-      } else {
-        val defaultPath = keystorePath ?: "${rootDir}/my-upload-key.jks"
-        storeFile = file(defaultPath)
-        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "1234567q"
-        keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
-        keyPassword = System.getenv("KEY_PASSWORD") ?: "1234567q"
+          ?: throw GradleException("KEYSTORE_PASSWORD is not set")
+
+        keyAlias = System.getenv("KEY_ALIAS")
+          ?: throw GradleException("KEY_ALIAS is not set")
+
+        keyPassword = System.getenv("KEY_PASSWORD")
+          ?: throw GradleException("KEY_PASSWORD is not set")
+
+        // Your generated keystore is PKCS12
+        storeType = "PKCS12"
       }
     }
+
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"

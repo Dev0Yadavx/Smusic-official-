@@ -2,11 +2,14 @@ package com.example.ui.theme
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Build
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.io.FileOutputStream
 
 enum class ThemeMode {
     SYSTEM,
@@ -22,17 +25,9 @@ enum class AccentPalette(
     val secondary: Color,
     val tertiary: Color
 ) {
-    EMERALD(
-        id = "emerald",
-        displayName = "Emerald Mint",
-        primaryDark = Color(0xFF6EE7B7),
-        primaryLight = Color(0xFF059669),
-        secondary = Color(0xFF93C5FD),
-        tertiary = Color(0xFFF472B6)
-    ),
     VIOLET(
         id = "violet",
-        displayName = "Violet Pulse",
+        displayName = "Electric Violet",
         primaryDark = Color(0xFFA78BFA),
         primaryLight = Color(0xFF7C3AED),
         secondary = Color(0xFFF472B6),
@@ -45,6 +40,14 @@ enum class AccentPalette(
         primaryLight = Color(0xFF0284C7),
         secondary = Color(0xFF818CF8),
         tertiary = Color(0xFFF472B6)
+    ),
+    INDIGO(
+        id = "indigo",
+        displayName = "Deep Indigo",
+        primaryDark = Color(0xFF818CF8),
+        primaryLight = Color(0xFF4F46E5),
+        secondary = Color(0xFFC084FC),
+        tertiary = Color(0xFF38BDF8)
     ),
     SUNSET(
         id = "sunset",
@@ -65,7 +68,7 @@ enum class AccentPalette(
 
     companion object {
         fun fromId(id: String): AccentPalette {
-            return entries.firstOrNull { it.id == id } ?: EMERALD
+            return entries.firstOrNull { it.id == id } ?: VIOLET
         }
     }
 }
@@ -124,12 +127,12 @@ class ThemeManager private constructor(context: Context) {
     val isAmoledBlack: StateFlow<Boolean> = _isAmoledBlack.asStateFlow()
 
     private val _accentPalette = MutableStateFlow(
-        AccentPalette.fromId(prefs.getString(KEY_ACCENT_PALETTE, AccentPalette.EMERALD.id) ?: AccentPalette.EMERALD.id)
+        AccentPalette.fromId(prefs.getString(KEY_ACCENT_PALETTE, AccentPalette.VIOLET.id) ?: AccentPalette.VIOLET.id)
     )
     val accentPalette: StateFlow<AccentPalette> = _accentPalette.asStateFlow()
 
     private val _fontOption = MutableStateFlow(
-        FontOption.fromId(prefs.getString(KEY_FONT_OPTION, FontOption.FIGTREE.id) ?: FontOption.FIGTREE.id)
+        FontOption.fromId(prefs.getString(KEY_FONT_OPTION, FontOption.PLUS_JAKARTA_SANS.id) ?: FontOption.PLUS_JAKARTA_SANS.id)
     )
     val fontOption: StateFlow<FontOption> = _fontOption.asStateFlow()
 
@@ -137,6 +140,26 @@ class ThemeManager private constructor(context: Context) {
         NowPlayingStyle.fromId(prefs.getString(KEY_NOW_PLAYING_STYLE, NowPlayingStyle.IMMERSIVE_POSTER.id) ?: NowPlayingStyle.IMMERSIVE_POSTER.id)
     )
     val nowPlayingStyle: StateFlow<NowPlayingStyle> = _nowPlayingStyle.asStateFlow()
+
+    private val _userNickname = MutableStateFlow(
+        prefs.getString(KEY_USER_NICKNAME, "Music Lover") ?: "Music Lover"
+    )
+    val userNickname: StateFlow<String> = _userNickname.asStateFlow()
+
+    private val _userAvatarEmoji = MutableStateFlow(
+        prefs.getString(KEY_USER_AVATAR_EMOJI, "🎧") ?: "🎧"
+    )
+    val userAvatarEmoji: StateFlow<String> = _userAvatarEmoji.asStateFlow()
+
+    private val _userAvatarImageUri = MutableStateFlow(
+        prefs.getString(KEY_USER_AVATAR_IMAGE_URI, null)
+    )
+    val userAvatarImageUri: StateFlow<String?> = _userAvatarImageUri.asStateFlow()
+
+    private val _hasAgreedPermissions = MutableStateFlow(
+        prefs.getBoolean(KEY_HAS_AGREED_PERMISSIONS, false)
+    )
+    val hasAgreedPermissions: StateFlow<Boolean> = _hasAgreedPermissions.asStateFlow()
 
     fun setThemeMode(mode: ThemeMode) {
         _themeMode.value = mode
@@ -168,13 +191,60 @@ class ThemeManager private constructor(context: Context) {
         prefs.edit().putString(KEY_NOW_PLAYING_STYLE, style.id).apply()
     }
 
+    fun setUserNickname(nickname: String) {
+        val clean = nickname.trim().ifEmpty { "Music Lover" }
+        _userNickname.value = clean
+        prefs.edit().putString(KEY_USER_NICKNAME, clean).apply()
+    }
+
+    fun setUserAvatarEmoji(emoji: String) {
+        _userAvatarEmoji.value = emoji
+        _userAvatarImageUri.value = null
+        prefs.edit()
+            .putString(KEY_USER_AVATAR_EMOJI, emoji)
+            .remove(KEY_USER_AVATAR_IMAGE_URI)
+            .apply()
+    }
+
+    fun setUserAvatarCustomImage(context: Context, uri: Uri) {
+        try {
+            val avatarsDir = File(context.applicationContext.filesDir, "avatars")
+            if (!avatarsDir.exists()) avatarsDir.mkdirs()
+            // Clean up older avatar files
+            avatarsDir.listFiles()?.forEach { it.delete() }
+            val destFile = File(avatarsDir, "avatar_${System.currentTimeMillis()}.jpg")
+            context.applicationContext.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(destFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            val savedPath = destFile.absolutePath
+            _userAvatarImageUri.value = savedPath
+            prefs.edit().putString(KEY_USER_AVATAR_IMAGE_URI, savedPath).apply()
+        } catch (e: Exception) {
+            // Fallback to URI string if file copy fails
+            val uriStr = uri.toString()
+            _userAvatarImageUri.value = uriStr
+            prefs.edit().putString(KEY_USER_AVATAR_IMAGE_URI, uriStr).apply()
+        }
+    }
+
+    fun setHasAgreedPermissions(agreed: Boolean) {
+        _hasAgreedPermissions.value = agreed
+        prefs.edit().putBoolean(KEY_HAS_AGREED_PERMISSIONS, agreed).apply()
+    }
+
     companion object {
         private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_DYNAMIC_COLOR = "key_dynamic_color"
         private const val KEY_AMOLED_BLACK = "key_amoled_black"
         private const val KEY_ACCENT_PALETTE = "key_accent_palette"
-        private const val KEY_FONT_OPTION = "key_font_option"
+        private const val KEY_FONT_OPTION = "key_font_option_v2"
         private const val KEY_NOW_PLAYING_STYLE = "key_now_playing_style"
+        private const val KEY_USER_NICKNAME = "key_user_nickname"
+        private const val KEY_USER_AVATAR_EMOJI = "key_user_avatar_emoji"
+        private const val KEY_USER_AVATAR_IMAGE_URI = "key_user_avatar_image_uri"
+        private const val KEY_HAS_AGREED_PERMISSIONS = "key_m3_permission_agreed_v2"
 
         @Volatile
         private var instance: ThemeManager? = null

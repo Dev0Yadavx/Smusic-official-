@@ -83,7 +83,7 @@ fun ExpressiveSplashScreen(
     val centerIconScale = remember { Animatable(0f) }
     val progressValue = remember { Animatable(0f) }
 
-    // 10 Seconds splash duration
+    // 5 Seconds splash duration
     LaunchedEffect(Unit) {
         launch {
             outerBadgeScale.animateTo(
@@ -118,14 +118,14 @@ fun ExpressiveSplashScreen(
         delay(150)
         showBottomProgress = true
 
-        // Progress smoothly fills over 10 seconds (10,000 ms)
+        // Progress smoothly fills over 5 seconds (5,000 ms)
         launch {
             progressValue.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 10000, easing = LinearEasing)
+                animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
             )
         }
-        delay(10000)
+        delay(5000)
         onSplashFinished()
     }
 

@@ -1,6 +1,7 @@
 package com.example.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,11 +18,17 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,6 +38,8 @@ import coil.compose.AsyncImage
 import com.example.data.model.*
 import com.example.player.PlayerManager
 import com.example.ui.common.*
+import com.example.ui.theme.AppFontFamily
+import com.example.ui.theme.ThemeManager
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +54,13 @@ fun HomeScreen(
     onNavigateToArtist: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager.getInstance(context) }
+    val userNickname by themeManager.userNickname.collectAsStateWithLifecycle()
+    val userAvatarEmoji by themeManager.userAvatarEmoji.collectAsStateWithLifecycle()
+    val userAvatarImageUri by themeManager.userAvatarImageUri.collectAsStateWithLifecycle()
+    var showProfileDialog by remember { mutableStateOf(false) }
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val currentPlayingTrack by playerManager.currentTrack.collectAsStateWithLifecycle()
@@ -53,14 +69,14 @@ fun HomeScreen(
     var selectedTrackForOptions by remember { mutableStateOf<PlayableTrack?>(null) }
     var isTrackLiked by remember { mutableStateOf(false) }
 
-    // Dynamic Time-Based Greeting with iOS-Style Aesthetic Emojis
+    // Clean Time-Based Greeting (no extra text)
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when (hour) {
-            in 4..11 -> "Good morning 🌅✨"
-            in 12..16 -> "Good afternoon ☀️🎵"
-            in 17..21 -> "Good evening 🌆✨"
-            else -> "Good night 🌌🎧"
+            in 4..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..21 -> "Good evening"
+            else -> "Good night"
         }
     }
 
@@ -146,8 +162,17 @@ fun HomeScreen(
                 }
             }
             is HomeUiState.Success -> {
+                val feedGraphicsLayer = rememberGraphicsLayer()
+
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .drawWithContent {
+                            feedGraphicsLayer.record {
+                                this@drawWithContent.drawContent()
+                            }
+                            drawLayer(feedGraphicsLayer)
+                        },
                     contentPadding = PaddingValues(top = 112.dp, bottom = 165.dp) // Leave space for fixed header and floating controls over mask
                 ) {
                     items(state.shelves, key = { it.id }) { shelf ->
@@ -172,10 +197,28 @@ fun HomeScreen(
                         )
                     }
                 }
+
+                // Live Background Reflection in Full Blur behind Sticky Top Header
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(114.dp)
+                        .align(Alignment.TopCenter)
+                        .clip(RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .blur(32.dp)
+                            .drawWithContent {
+                                drawLayer(feedGraphicsLayer)
+                            }
+                    )
+                }
             }
         }
 
-        // Fixed Sticky Header with iOS Aesthetic & Gradient Mask Blur Effect
+        // Fixed Sticky Header with Full Blur Background Reflection
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -187,9 +230,9 @@ fun HomeScreen(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.98f),
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.82f),
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.55f)
                             )
                         )
                     )
@@ -201,16 +244,10 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = greeting,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // 1. SMusic Brand Upper
                         Text(
                             text = "SMusic",
                             style = MaterialTheme.typography.headlineMedium.copy(
@@ -223,6 +260,35 @@ fun HomeScreen(
                                 )
                             )
                         )
+
+                        // 2. Good Morning Niche with Avatar & Nickname right next to it (no extra text)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { showProfileDialog = true }
+                                .padding(end = 6.dp, top = 2.dp, bottom = 2.dp)
+                                .testTag("home_greeting_profile_row")
+                        ) {
+                            UserAvatarBadge(
+                                emoji = userAvatarEmoji,
+                                customImageUri = userAvatarImageUri,
+                                size = 26.dp,
+                                fontSize = 14.sp,
+                                onClick = { showProfileDialog = true }
+                            )
+                            Text(
+                                text = "$greeting, $userNickname",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -276,6 +342,13 @@ fun HomeScreen(
                     )
             )
         }
+    }
+
+    if (showProfileDialog) {
+        UserProfileM3CardDialog(
+            themeManager = themeManager,
+            onDismiss = { showProfileDialog = false }
+        )
     }
 
     var trackForAddToPlaylist by remember { mutableStateOf<PlayableTrack?>(null) }
@@ -488,7 +561,10 @@ fun QuickPickRowItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
+                    fontFamily = AppFontFamily,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = AppFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.5.sp,
                         color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -499,7 +575,13 @@ fun QuickPickRowItem(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = song.artist,
+                    fontFamily = AppFontFamily,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.Normal,
                     style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     ),

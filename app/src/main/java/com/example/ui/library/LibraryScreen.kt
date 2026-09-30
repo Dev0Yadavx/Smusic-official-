@@ -9,6 +9,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import com.example.ui.common.ThreeLineVisualizer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +59,7 @@ import com.example.player.PlayerManager
 import com.example.ui.common.AddToPlaylistBottomSheet
 import com.example.ui.common.FourSongGridCover
 import com.example.ui.common.SongRowItem
+import com.example.ui.theme.AppFontFamily
 import com.example.ui.common.TrackOptionsBottomSheet
 import com.example.ui.theme.Cookie4Sided
 
@@ -82,7 +87,9 @@ data class LibraryOverviewCardData(
     val subtitle: String,
     val count: Int = 0,
     val icon: ImageVector? = null,
-    val isJioSaavn: Boolean = false,
+    val iconDrawableRes: Int? = null,
+    val iconColor: Color? = null,
+    val containerColor: Color? = null,
     val onClick: () -> Unit
 )
 
@@ -157,8 +164,8 @@ fun LibraryScreen(
             subtitle = if (downloadedSongs.isEmpty()) "Offline music" else "${downloadedSongs.size} saved",
             count = downloadedSongs.size,
             icon = com.example.ui.theme.AppIcons.DownloadForOffline,
-            startGradient = Color(0xFF10B981), // Emerald Green
-            endGradient = Color(0xFF047857)
+            startGradient = Color(0xFF0284C7), // Pixel Sky Blue
+            endGradient = Color(0xFF0369A1)
         ),
         LibrarySquareBox(
             tab = LibraryTab.PLAYLISTS,
@@ -254,7 +261,7 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Import JioSaavn Playlist button
+                        // Import Playlist button (JioSaavn SVG Icon)
                         IconButton(
                             onClick = { showImportPlaylistSheet = true },
                             modifier = Modifier
@@ -263,9 +270,10 @@ fun LibraryScreen(
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 .testTag("import_playlist_button")
                         ) {
-                            JioSaavnBubbleIcon(
-                                size = 22.dp,
-                                contentDescription = "Import JioSaavn Playlist"
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_jiosaavn),
+                                contentDescription = "Import Playlist",
+                                modifier = Modifier.size(22.dp)
                             )
                         }
 
@@ -314,8 +322,10 @@ fun LibraryScreen(
                         LibraryOverviewCardData(
                             id = "import_playlist",
                             title = "Import Playlist",
-                            subtitle = "Paste JioSaavn link",
-                            isJioSaavn = true,
+                            subtitle = "Paste playlist link",
+                            iconDrawableRes = R.drawable.ic_jiosaavn,
+                            iconColor = Color(0xFF00D285),
+                            containerColor = Color(0xFF00D285).copy(alpha = 0.16f),
                             onClick = { showImportPlaylistSheet = true }
                         ),
                         LibraryOverviewCardData(
@@ -324,6 +334,8 @@ fun LibraryScreen(
                             subtitle = if (likedSongs.isEmpty()) "Favorite tracks" else "${likedSongs.size} tracks",
                             count = likedSongs.size,
                             icon = Icons.Filled.Favorite,
+                            iconColor = Color(0xFFF43F5E),
+                            containerColor = Color(0xFFF43F5E).copy(alpha = 0.16f),
                             onClick = {
                                 viewModel.setTab(LibraryTab.LIKED)
                                 showOverviewGrid = false
@@ -334,7 +346,9 @@ fun LibraryScreen(
                             title = "Downloads",
                             subtitle = if (downloadedSongs.isEmpty()) "Offline tracks" else "${downloadedSongs.size} saved",
                             count = downloadedSongs.size,
-                            icon = com.example.ui.theme.AppIcons.DownloadForOffline,
+                            icon = Icons.Rounded.Download,
+                            iconColor = Color(0xFF0284C7),
+                            containerColor = Color(0xFF0284C7).copy(alpha = 0.16f),
                             onClick = {
                                 viewModel.setTab(LibraryTab.DOWNLOADS)
                                 showOverviewGrid = false
@@ -346,6 +360,8 @@ fun LibraryScreen(
                             subtitle = if (playlists.isEmpty()) "Custom mixes" else "${playlists.size} playlists",
                             count = playlists.size,
                             icon = Icons.AutoMirrored.Filled.QueueMusic,
+                            iconColor = Color(0xFF8B5CF6),
+                            containerColor = Color(0xFF8B5CF6).copy(alpha = 0.16f),
                             onClick = {
                                 viewModel.setTab(LibraryTab.PLAYLISTS)
                                 showOverviewGrid = false
@@ -357,6 +373,8 @@ fun LibraryScreen(
                             subtitle = if (recentlyPlayed.isEmpty()) "Recent listens" else "${recentlyPlayed.size} played",
                             count = recentlyPlayed.size,
                             icon = Icons.Filled.History,
+                            iconColor = Color(0xFFF59E0B),
+                            containerColor = Color(0xFFF59E0B).copy(alpha = 0.16f),
                             onClick = {
                                 viewModel.setTab(LibraryTab.RECENT)
                                 showOverviewGrid = false
@@ -368,6 +386,8 @@ fun LibraryScreen(
                             subtitle = if (localSongs.isEmpty()) "Device storage" else "${localSongs.size} songs",
                             count = localSongs.size,
                             icon = Icons.Filled.FolderOpen,
+                            iconColor = Color(0xFF6366F1),
+                            containerColor = Color(0xFF6366F1).copy(alpha = 0.16f),
                             onClick = {
                                 viewModel.setTab(LibraryTab.LOCAL)
                                 showOverviewGrid = false
@@ -545,7 +565,7 @@ fun LibraryScreen(
 
                                     EmptyLibraryState(
                                         title = "Create Your First Playlist",
-                                        message = "Organize songs by your mood, favorite artists, or import playlists directly from JioSaavn.",
+                                        message = "Organize songs by your mood, favorite artists, or import playlists directly from a link.",
                                         icon = Icons.Outlined.QueueMusic,
                                         accentColor = Color(0xFF8B5CF6),
                                         actionText = "Create Playlist",
@@ -573,7 +593,11 @@ fun LibraryScreen(
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                                 shape = RoundedCornerShape(20.dp)
                                             ) {
-                                                JioSaavnBubbleIcon(size = 18.dp, contentDescription = null)
+                                                Icon(
+                                                    imageVector = Icons.Rounded.CloudDownload,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text("Import", fontWeight = FontWeight.SemiBold)
                                             }
@@ -817,13 +841,8 @@ fun LibraryGrid2x2Card(
     item: LibraryOverviewCardData,
     modifier: Modifier = Modifier
 ) {
-    // M3 Expressive Asymmetrical Shape: Large start rounding (topStart 28.dp) & Large end rounding (bottomEnd 28.dp)
-    val expressiveCardShape = RoundedCornerShape(
-        topStart = 28.dp,
-        bottomStart = 12.dp,
-        topEnd = 12.dp,
-        bottomEnd = 28.dp
-    )
+    // M3 Expressive Card Shape: Smooth 20.dp rounded corners with tonal depth
+    val expressiveCardShape = RoundedCornerShape(20.dp)
 
     Surface(
         onClick = item.onClick,
@@ -835,7 +854,7 @@ fun LibraryGrid2x2Card(
         ),
         tonalElevation = 2.dp,
         modifier = modifier
-            .height(114.dp)
+            .height(106.dp)
             .testTag("library_grid_item_${item.id}")
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -860,59 +879,56 @@ fun LibraryGrid2x2Card(
                 }
             }
 
-            // All content centered: Icon + Title + Subtitle
+            // All content centered: Square-Rounded Icon Container + Title + Subtitle
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                val isLiked = item.id == "liked"
+                val iconColor = item.iconColor ?: MaterialTheme.colorScheme.primary
+                val containerColor = item.containerColor ?: MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.60f)
+
+                // Square Rounded Icon Shape: RoundedCornerShape(13.dp)
                 Surface(
-                    shape = Cookie4Sided,
-                    color = if (isLiked) {
-                        Color(0xFFF43F5E).copy(alpha = 0.16f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHighest
-                    },
+                    shape = RoundedCornerShape(13.dp),
+                    color = containerColor,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        if (isLiked) {
-                            Color(0xFFF43F5E).copy(alpha = 0.40f)
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                        }
+                        iconColor.copy(alpha = 0.25f)
                     ),
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(42.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        if (item.isJioSaavn) {
-                            JioSaavnBubbleIcon(
-                                size = 26.dp,
-                                contentDescription = item.title
+                        if (item.iconDrawableRes != null || item.id == "import_playlist") {
+                            val res = item.iconDrawableRes ?: R.drawable.ic_jiosaavn
+                            Image(
+                                painter = painterResource(id = res),
+                                contentDescription = item.title,
+                                modifier = Modifier.size(24.dp)
                             )
                         } else if (item.icon != null) {
                             Icon(
                                 imageVector = item.icon,
                                 contentDescription = item.title,
-                                tint = if (isLiked) Color(0xFFF43F5E) else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                                tint = iconColor,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(7.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.5.sp
+                        fontSize = 13.5.sp
                     ),
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -920,13 +936,13 @@ fun LibraryGrid2x2Card(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
 
                 Text(
                     text = item.subtitle,
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.5.sp
+                        fontSize = 11.sp
                     ),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     maxLines = 1,
@@ -943,12 +959,12 @@ fun LibraryHorizontalItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // M3 Expressive Asymmetrical Shape: Large start rounding (topStart 28.dp) & Large end rounding (bottomEnd 28.dp)
+    // M3 Expressive Asymmetrical Shape: Large start rounding (topStart 24.dp) & Large end rounding (bottomEnd 24.dp)
     val expressiveCardShape = RoundedCornerShape(
-        topStart = 28.dp,
+        topStart = 24.dp,
         bottomStart = 12.dp,
         topEnd = 12.dp,
-        bottomEnd = 28.dp
+        bottomEnd = 24.dp
     )
 
     Surface(
@@ -970,16 +986,16 @@ fun LibraryHorizontalItemCard(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Cookie4Sided Icon Container (M3 Expressive Shape)
+            // Square Rounded Icon Container
             val isLiked = box.tab == LibraryTab.LIKED
             Surface(
-                shape = Cookie4Sided,
+                shape = RoundedCornerShape(13.dp),
                 color = if (isLiked) Color(0xFFF43F5E).copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHighest,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
                     if (isLiked) Color(0xFFF43F5E).copy(alpha = 0.40f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                 ),
-                modifier = Modifier.size(46.dp)
+                modifier = Modifier.size(44.dp)
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -1232,7 +1248,7 @@ fun DownloadsSection(
             title = "No Offline Downloads",
             message = "Download your favorite tracks to listen anytime 100% offline without using mobile data.",
             icon = com.example.ui.theme.AppIcons.DownloadForOffline,
-            accentColor = Color(0xFF10B981)
+            accentColor = Color(0xFF0284C7)
         )
     } else {
         LazyColumn(
@@ -1251,8 +1267,8 @@ fun DownloadsSection(
 
                     Surface(
                         shape = RoundedCornerShape(18.dp),
-                        color = Color(0xFF10B981).copy(alpha = 0.12f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.25f)),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.40f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -1266,7 +1282,7 @@ fun DownloadsSection(
                                 Icon(
                                     imageVector = com.example.ui.theme.AppIcons.DownloadForOffline,
                                     contentDescription = null,
-                                    tint = Color(0xFF10B981),
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
@@ -1457,7 +1473,12 @@ fun ActiveDownloadItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    fontFamily = AppFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = AppFontFamily,
+                        fontWeight = FontWeight.Bold
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1469,10 +1490,15 @@ fun ActiveDownloadItemCard(
                         } else {
                             "${task.artist} • $sizeText (${task.progress}%)"
                         },
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
                         style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFontFamily,
+                            fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.Normal,
                             color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = 11.sp
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1554,13 +1580,13 @@ fun DownloadedSongRowItem(
                             .padding(2.dp)
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF10B981)),
+                            .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Offline Available",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(10.dp)
                         )
                     }
@@ -1572,7 +1598,10 @@ fun DownloadedSongRowItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = track.title,
+                    fontFamily = AppFontFamily,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = AppFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     ),
@@ -1586,7 +1615,7 @@ fun DownloadedSongRowItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFF10B981).copy(alpha = 0.15f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                         modifier = Modifier.padding(end = 6.dp)
                     ) {
                         Text(
@@ -1594,7 +1623,7 @@ fun DownloadedSongRowItem(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF10B981)
+                                color = MaterialTheme.colorScheme.primary
                             ),
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
@@ -1614,7 +1643,13 @@ fun DownloadedSongRowItem(
 
                     Text(
                         text = subtitle,
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
                         style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFontFamily,
+                            fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         ),

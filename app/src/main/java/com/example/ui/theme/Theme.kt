@@ -19,7 +19,7 @@ fun buildExpressiveDarkColorScheme(
 
     return darkColorScheme(
         primary = accent.primaryDark,
-        onPrimary = Color(0xFF022C22),
+        onPrimary = Color(0xFF1E0E45),
         primaryContainer = surfVar,
         onPrimaryContainer = accent.primaryDark,
         secondary = accent.secondary,
@@ -47,8 +47,8 @@ fun buildExpressiveLightColorScheme(
     return lightColorScheme(
         primary = accent.primaryLight,
         onPrimary = Color.White,
-        primaryContainer = Color(0xFFE0F2FE),
-        onPrimaryContainer = Color(0xFF0369A1),
+        primaryContainer = Color(0xFFF3E8FF),
+        onPrimaryContainer = Color(0xFF6B21A8),
         secondary = accent.secondary,
         onSecondary = Color.White,
         secondaryContainer = PixelLightSurfaceCard,
@@ -72,8 +72,8 @@ fun SMusicTheme(
     themeMode: ThemeMode = ThemeMode.DARK,
     dynamicColor: Boolean = true,
     isAmoledBlack: Boolean = false,
-    accentPalette: AccentPalette = AccentPalette.EMERALD,
-    fontOption: FontOption = FontOption.FIGTREE,
+    accentPalette: AccentPalette = AccentPalette.VIOLET,
+    fontOption: FontOption = FontOption.PLUS_JAKARTA_SANS,
     content: @Composable () -> Unit,
 ) {
     val isDarkTheme = when (themeMode) {

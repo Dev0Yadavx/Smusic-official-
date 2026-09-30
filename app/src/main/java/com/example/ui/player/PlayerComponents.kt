@@ -44,26 +44,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,9 +92,10 @@ import com.example.player.PlayerManager
 import com.example.player.RepeatMode
 import com.example.repository.MusicRepository
 import com.example.ui.common.ThreeLineVisualizer
+import com.example.ui.settings.EqualizerScreen
+import com.example.ui.theme.AppFontFamily
 import com.example.ui.theme.AppIcons
 import com.example.ui.theme.MiniPlayerScallopedShape
-import com.example.ui.theme.NowPlayingStyle
 import com.example.ui.theme.ThemeManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -378,7 +391,8 @@ fun MiniPlayer(
     playerManager: PlayerManager,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    repository: MusicRepository? = null
+    repository: MusicRepository? = null,
+    backgroundGraphicsLayer: GraphicsLayer? = null
 ) {
     val currentTrack by playerManager.currentTrack.collectAsState()
     val isPlaying by playerManager.isPlaying.collectAsState()
@@ -417,10 +431,16 @@ fun MiniPlayer(
 
     // Horizontal swipe gesture for skipping tracks
     var dragOffsetX by remember { mutableStateOf(0f) }
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    var rootOffset by remember { mutableStateOf(Offset.Zero) }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .onGloballyPositioned { coordinates ->
+                rootOffset = coordinates.positionInRoot()
+            }
+            .clip(CircleShape)
             .pointerInput(track.id) {
                 detectHorizontalDragGestures(
                     onDragStart = { dragOffsetX = 0f },
@@ -442,31 +462,83 @@ fun MiniPlayer(
             .clickable(onClick = onClick)
             .testTag("mini_player")
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Top Slim Progress Bar with smooth rounded look
-            LinearProgressIndicator(
-                progress = { progress },
+        // 1. Live Background Reflection in Full Blur ("background ka reflicton full blur me")
+        if (backgroundGraphicsLayer != null) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    .matchParentSize()
+                    .blur(32.dp)
+                    .drawWithContent {
+                        translate(left = -rootOffset.x, top = -rootOffset.y) {
+                            drawLayer(backgroundGraphicsLayer)
+                        }
+                    }
             )
-
-            Row(
+        } else {
+            AsyncImage(
+                model = track.artwork,
+                contentDescription = null,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .matchParentSize()
+                    .scale(2.0f)
+                    .blur(36.dp),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        // 2. Clean Dark / Light Frosted Glass Tint (No moving reflection animation)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    if (isDark) {
+                        Color(0xFF10141D).copy(alpha = 0.56f)
+                    } else {
+                        Color(0xFFF8FAFF).copy(alpha = 0.62f)
+                    }
+                )
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (isDark) {
+                            listOf(
+                                Color.White.copy(alpha = 0.16f),
+                                Color.White.copy(alpha = 0.03f),
+                                Color.Transparent
+                            )
+                        } else {
+                            listOf(
+                                Color.White.copy(alpha = 0.78f),
+                                Color.White.copy(alpha = 0.28f),
+                                Color.Transparent
+                            )
+                        }
+                    )
+                )
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Full Rounded Album Art with Circular Progress Ring & Spin Animation
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(48.dp)
             ) {
-                // Album Art with custom scalloped star/flower shape and running spin animation while playing
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
+                    strokeWidth = 2.5.dp
+                )
                 Box(
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(40.dp)
                         .rotate(artworkRotation)
-                        .clip(MiniPlayerScallopedShape)
+                        .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     AsyncImage(
@@ -476,105 +548,118 @@ fun MiniPlayer(
                         contentScale = ContentScale.Crop
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-                // Title & Artist with Marquee
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.Center
+            // Title & Artist with Marquee
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = track.title,
+                    fontFamily = AppFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = AppFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.5.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier.basicMarquee()
+                )
+                Spacer(modifier = Modifier.height(1.dp))
+                Text(
+                    text = track.artist,
+                    fontFamily = AppFontFamily,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.Normal,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Like / Favorite Button
+            if (repository != null) {
+                val heartScale by animateFloatAsState(
+                    targetValue = if (isLiked) 1.2f else 1.0f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "mini_like_scale"
+                )
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            repository.toggleLike(track)
+                        }
+                    },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .scale(heartScale)
+                        .testTag("mini_player_like")
                 ) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.5.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee()
-                    )
-                    Spacer(modifier = Modifier.height(1.dp))
-                    Text(
-                        text = track.artist,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.5.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    Icon(
+                        imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        contentDescription = if (isLiked) "Unlike" else "Like",
+                        tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
+            }
 
-                // Like / Favorite Button
-                if (repository != null) {
-                    val heartScale by animateFloatAsState(
-                        targetValue = if (isLiked) 1.2f else 1.0f,
-                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                        label = "mini_like_scale"
-                    )
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                repository.toggleLike(track)
-                            }
-                        },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .scale(heartScale)
-                            .testTag("mini_player_like")
-                    ) {
+            // Play / Pause Button in Full Rounded Circle Container
+            Surface(
+                onClick = { playerManager.playPause() },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .size(42.dp)
+                    .testTag("mini_player_play_pause")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (isBuffering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
                         Icon(
-                            imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            contentDescription = if (isLiked) "Unlike" else "Like",
-                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
+            }
 
-                // Play / Pause Button in M3 styled Container
-                Surface(
-                    onClick = { playerManager.playPause() },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .testTag("mini_player_play_pause")
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (isBuffering) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                }
+            Spacer(modifier = Modifier.width(4.dp))
 
-                Spacer(modifier = Modifier.width(4.dp))
-
-                // Next Track Button
-                IconButton(
-                    onClick = { playerManager.skipToNext() },
-                    modifier = Modifier
-                        .size(38.dp)
-                        .testTag("mini_player_next")
-                ) {
+            // Next Track Button
+            Surface(
+                onClick = { playerManager.skipToNext() },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
+                modifier = Modifier
+                    .size(38.dp)
+                    .testTag("mini_player_next")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = AppIcons.SkipNext,
                         contentDescription = "Next Track",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -607,6 +692,7 @@ fun NowPlayingModal(
     val volume by playerManager.volume.collectAsState()
     val queue by playerManager.queue.collectAsState()
     val currentIndex by playerManager.currentIndex.collectAsState()
+    val isAutoplayEnabled by playerManager.isAutoplayEnabled.collectAsState()
     val errorMessage by playerManager.errorMessage.collectAsState()
 
     var showQueueSheet by remember { mutableStateOf(false) }
@@ -727,147 +813,38 @@ fun NowPlayingModal(
                 )
             }
     ) {
-        AnimatedContent(
-            targetState = nowPlayingStyle,
-            transitionSpec = {
-                fadeIn(animationSpec = tween(250)) togetherWith fadeOut(animationSpec = tween(200))
+        ImmersivePosterNowPlayingLayout(
+            track = currentT,
+            isPlaying = isPlaying,
+            isBuffering = isBuffering,
+            displayPositionMs = displayPositionMs,
+            totalDurationMs = totalDurationMs,
+            formatTime = formatTime,
+            isLiked = isLiked,
+            likeScale = likeScale,
+            errorMessage = errorMessage,
+            dynamicColors = dynamicColors,
+            onToggleLike = {
+                likeAnimateTrigger = true
+                scope.launch { repository.toggleLike(currentT) }
             },
-            label = "NowPlayingStyleTransition"
-        ) { currentStyle ->
-        when (currentStyle) {
-            NowPlayingStyle.IMMERSIVE_POSTER -> {
-                ImmersivePosterNowPlayingLayout(
-                    track = currentT,
-                    isPlaying = isPlaying,
-                    isBuffering = isBuffering,
-                    displayPositionMs = displayPositionMs,
-                    totalDurationMs = totalDurationMs,
-                    formatTime = formatTime,
-                    isLiked = isLiked,
-                    likeScale = likeScale,
-                    errorMessage = errorMessage,
-                    onDismiss = onDismiss,
-                    onShare = { shareCurrentTrack() },
-                    onToggleLike = {
-                        likeAnimateTrigger = true
-                        scope.launch { repository.toggleLike(currentT) }
-                    },
-                    onMoreOptions = { showMoreOptionsSheet = true },
-                    onSeek = { pos ->
-                        isUserDraggingSlider = true
-                        sliderDragPositionMs = pos
-                    },
-                    onSeekFinished = {
-                        playerManager.seekTo(sliderDragPositionMs.toLong())
-                        isUserDraggingSlider = false
-                    },
-                    onPrevious = { playerManager.skipToPrevious() },
-                    onPlayPause = { playerManager.playPause() },
-                    onNext = { playerManager.skipToNext() },
-                    onRetry = { playerManager.retryCurrentTrack() },
-                    onOpenQueue = { showQueueSheet = true },
-                    onOpenLyrics = { showLyricsSheet = true },
-                    onOpenDeviceSelector = { showDeviceDialog = true }
-                )
-            }
-            NowPlayingStyle.VINYL_DISC -> {
-                VinylDiscNowPlayingLayout(
-                    track = currentT,
-                    isPlaying = isPlaying,
-                    isBuffering = isBuffering,
-                    displayPositionMs = displayPositionMs,
-                    totalDurationMs = totalDurationMs,
-                    formatTime = formatTime,
-                    isLiked = isLiked,
-                    likeScale = likeScale,
-                    isShuffle = isShuffle,
-                    repeatMode = repeatMode,
-                    isDownloading = isDownloading,
-                    isDownloaded = isDownloaded,
-                    downloadProgress = downloadProgress,
-                    errorMessage = errorMessage,
-                    dynamicColors = dynamicColors,
-                    onDismiss = onDismiss,
-                    onToggleLike = {
-                        likeAnimateTrigger = true
-                        scope.launch { repository.toggleLike(currentT) }
-                    },
-                    onToggleShuffle = { playerManager.toggleShuffle() },
-                    onToggleRepeat = { playerManager.toggleRepeat() },
-                    onDownload = {
-                        if (isDownloading) {
-                            downloadManager.cancelDownload(currentT.id)
-                            Toast.makeText(context, "Download cancelled", Toast.LENGTH_SHORT).show()
-                        } else if (isDownloaded) {
-                            downloadManager.deleteDownloadedSong(currentT.id)
-                            Toast.makeText(context, "Removed from downloads", Toast.LENGTH_SHORT).show()
-                        } else {
-                            downloadManager.startDownload(currentT, "320")
-                            Toast.makeText(context, "Downloading in 320kbps HD...", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onRadio = {
-                        playerManager.skipToNext()
-                        Toast.makeText(context, "Playing recommendations for ${currentT.title}", Toast.LENGTH_SHORT).show()
-                    },
-                    onSleepTimer = { showSleepTimerDialog = true },
-                    onMoreOptions = { showMoreOptionsSheet = true },
-                    onSeek = { pos ->
-                        isUserDraggingSlider = true
-                        sliderDragPositionMs = pos
-                    },
-                    onSeekFinished = {
-                        playerManager.seekTo(sliderDragPositionMs.toLong())
-                        isUserDraggingSlider = false
-                    },
-                    onPrevious = { playerManager.skipToPrevious() },
-                    onPlayPause = { playerManager.playPause() },
-                    onNext = { playerManager.skipToNext() },
-                    onRetry = { playerManager.retryCurrentTrack() },
-                    onOpenQueue = { showQueueSheet = true }
-                )
-            }
-            NowPlayingStyle.MODERN_CARD -> {
-                ModernCardNowPlayingLayout(
-                    track = currentT,
-                    isPlaying = isPlaying,
-                    isBuffering = isBuffering,
-                    displayPositionMs = displayPositionMs,
-                    totalDurationMs = totalDurationMs,
-                    formatTime = formatTime,
-                    isLiked = isLiked,
-                    likeScale = likeScale,
-                    isShuffle = isShuffle,
-                    repeatMode = repeatMode,
-                    errorMessage = errorMessage,
-                    dynamicColors = dynamicColors,
-                    onDismiss = onDismiss,
-                    onToggleLike = {
-                        likeAnimateTrigger = true
-                        scope.launch { repository.toggleLike(currentT) }
-                    },
-                    onToggleShuffle = { playerManager.toggleShuffle() },
-                    onToggleRepeat = { playerManager.toggleRepeat() },
-                    onMoreOptions = { showMoreOptionsSheet = true },
-                    onSeek = { pos ->
-                        isUserDraggingSlider = true
-                        sliderDragPositionMs = pos
-                    },
-                    onSeekFinished = {
-                        playerManager.seekTo(sliderDragPositionMs.toLong())
-                        isUserDraggingSlider = false
-                    },
-                    onPrevious = { playerManager.skipToPrevious() },
-                    onPlayPause = { playerManager.playPause() },
-                    onNext = { playerManager.skipToNext() },
-                    onRetry = { playerManager.retryCurrentTrack() },
-                    onOpenQueue = { showQueueSheet = true },
-                    onOpenLyrics = { showLyricsSheet = true },
-                    onOpenDeviceSelector = { showDeviceDialog = true }
-                )
-            }
-        }
-    }
+            onMoreOptions = { showMoreOptionsSheet = true },
+            onSeek = { pos ->
+                isUserDraggingSlider = true
+                sliderDragPositionMs = pos
+            },
+            onSeekFinished = {
+                playerManager.seekTo(sliderDragPositionMs.toLong())
+                isUserDraggingSlider = false
+            },
+            onPrevious = { playerManager.skipToPrevious() },
+            onPlayPause = { playerManager.playPause() },
+            onNext = { playerManager.skipToNext() },
+            onRetry = { playerManager.retryCurrentTrack() },
+            onOpenQueue = { showQueueSheet = true },
+            onOpenLyrics = { showLyricsSheet = true },
+            onOpenDeviceSelector = { showDeviceDialog = true }
+        )
     }
 
     // Bottom Sheet: Queue (Up Next)
@@ -876,6 +853,12 @@ fun NowPlayingModal(
             queue = queue,
             currentIndex = currentIndex,
             isPlaying = isPlaying,
+            isAutoplayEnabled = isAutoplayEnabled,
+            onToggleAutoplay = { playerManager.setAutoplayEnabled(!isAutoplayEnabled) },
+            onLoadMoreRecommendations = {
+                playerManager.loadMoreRecommendations()
+                Toast.makeText(context, "Loading more recommended songs...", Toast.LENGTH_SHORT).show()
+            },
             onDismiss = { showQueueSheet = false },
             onSelectTrack = { index ->
                 playerManager.playTrack(queue[index], queue)
@@ -918,6 +901,20 @@ fun NowPlayingModal(
     }
 
     // Bottom Sheet: 3-Dot More Options
+    var showEqualizerModal by remember { mutableStateOf(false) }
+
+    if (showEqualizerModal) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            EqualizerScreen(
+                onBack = { showEqualizerModal = false },
+                equalizerManager = playerManager.equalizerManager
+            )
+        }
+    }
+
     if (showMoreOptionsSheet) {
         SongOptionsBottomSheet(
             track = currentT,
@@ -931,6 +928,7 @@ fun NowPlayingModal(
             onVolumeChange = { playerManager.setVolume(it) },
             onToggleLike = {
                 scope.launch { repository.toggleLike(currentT) }
+                showMoreOptionsSheet = false
             },
             onToggleShuffle = {
                 playerManager.toggleShuffle()
@@ -950,6 +948,10 @@ fun NowPlayingModal(
                 showMoreOptionsSheet = false
                 showCreditsSheet = true
             },
+            onOpenEqualizer = {
+                showMoreOptionsSheet = false
+                showEqualizerModal = true
+            },
             onDownload = {
                 if (isDownloading) {
                     downloadManager.cancelDownload(currentT.id)
@@ -961,6 +963,11 @@ fun NowPlayingModal(
                     downloadManager.startDownload(currentT, "320")
                     Toast.makeText(context, "Downloading ${currentT.title}...", Toast.LENGTH_SHORT).show()
                 }
+            },
+            onStartRadio = {
+                showMoreOptionsSheet = false
+                playerManager.startRadio(currentT)
+                Toast.makeText(context, "Playing Radio Mix for ${currentT.title}", Toast.LENGTH_SHORT).show()
             },
             onAddToPlaylist = {
                 showMoreOptionsSheet = false
@@ -1015,9 +1022,117 @@ fun NowPlayingModal(
 }
 
 /**
- * 1. IMMERSIVE POSTER NOW PLAYING LAYOUT (Photo 1)
- * Full-screen artwork canvas with ambient blur, glass scrim, audio format badge,
- * large rounded seeker, and speaker/queue pills.
+ * Real-time Active Audio Output Device State & Listener
+ * Monitors connected Bluetooth, Wired Headphones, USB DACs, Cast/HDMI, or Speaker in real time.
+ */
+data class ActiveAudioDeviceUi(
+    val name: String,
+    val icon: ImageVector,
+    val isExternalConnected: Boolean
+)
+
+@Composable
+fun rememberActiveAudioOutputDevice(): ActiveAudioDeviceUi {
+    val context = LocalContext.current
+    val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+
+    fun queryCurrentDevice(): ActiveAudioDeviceUi {
+        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val btDevice = devices.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (
+                    it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                        it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                        it.type == AudioDeviceInfo.TYPE_BLE_BROADCAST
+                    ))
+        }
+        if (btDevice != null) {
+            val productName = btDevice.productName?.toString()?.trim()
+            val label = if (!productName.isNullOrEmpty() && !productName.equals(Build.MODEL, ignoreCase = true)) {
+                productName
+            } else {
+                "Bluetooth"
+            }
+            return ActiveAudioDeviceUi(
+                name = label,
+                icon = Icons.Rounded.BluetoothAudio,
+                isExternalConnected = true
+            )
+        }
+
+        val wiredDevice = devices.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+        }
+        if (wiredDevice != null) {
+            val productName = wiredDevice.productName?.toString()?.trim()
+            val label = if (!productName.isNullOrEmpty() && !productName.equals(Build.MODEL, ignoreCase = true)) {
+                productName
+            } else {
+                "Headphones"
+            }
+            return ActiveAudioDeviceUi(
+                name = label,
+                icon = Icons.Rounded.Headphones,
+                isExternalConnected = true
+            )
+        }
+
+        val usbDevice = devices.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+                it.type == AudioDeviceInfo.TYPE_USB_DEVICE ||
+                it.type == AudioDeviceInfo.TYPE_USB_ACCESSORY
+        }
+        if (usbDevice != null) {
+            val productName = usbDevice.productName?.toString()?.trim()
+            val label = if (!productName.isNullOrEmpty() && !productName.equals(Build.MODEL, ignoreCase = true)) {
+                productName
+            } else {
+                "USB Audio"
+            }
+            return ActiveAudioDeviceUi(
+                name = label,
+                icon = Icons.Rounded.Usb,
+                isExternalConnected = true
+            )
+        }
+
+        return ActiveAudioDeviceUi(
+            name = "Speaker",
+            icon = Icons.Outlined.VolumeUp,
+            isExternalConnected = false
+        )
+    }
+
+    var activeDevice by remember { mutableStateOf(queryCurrentDevice()) }
+
+    DisposableEffect(audioManager) {
+        val callback = object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                activeDevice = queryCurrentDevice()
+            }
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                activeDevice = queryCurrentDevice()
+            }
+        }
+        audioManager.registerAudioDeviceCallback(callback, Handler(Looper.getMainLooper()))
+        onDispose {
+            audioManager.unregisterAudioDeviceCallback(callback)
+        }
+    }
+
+    return activeDevice
+}
+
+/**
+ * UNIFIED NOW PLAYING SCREEN
+ * - No Close Arrow or Share icon in top header
+ * - Tap artwork to toggle between Full-Screen Poster Cover and Spotify-Style Square Art Cover
+ * - Full Bottom Mask Blur under controls
+ * - Splash-Screen Style Rounded Gradient Loading Progress Seekbar
+ * - Square FAB style Queue & Lyrics buttons + Real-time Connected Audio Output Device button
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1031,8 +1146,7 @@ fun ImmersivePosterNowPlayingLayout(
     isLiked: Boolean,
     likeScale: Float,
     errorMessage: String?,
-    onDismiss: () -> Unit,
-    onShare: () -> Unit,
+    dynamicColors: DynamicSongColors,
     onToggleLike: () -> Unit,
     onMoreOptions: () -> Unit,
     onSeek: (Float) -> Unit,
@@ -1045,37 +1159,109 @@ fun ImmersivePosterNowPlayingLayout(
     onOpenLyrics: () -> Unit,
     onOpenDeviceSelector: () -> Unit
 ) {
+    // Toggle between Full-Screen Poster Art Cover and Spotify-Style Square Art Cover on tap
+    var isSpotifyStyleCover by remember { mutableStateOf(false) }
+
+    // Real-time connected audio output device (Bluetooth, Headphones, USB, or Speaker)
+    val activeAudioDevice = rememberActiveAudioOutputDevice()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color(0xFF070809))
     ) {
-        // Full Canvas Background Artwork
+        // 1. Background Layer:
+        // In Spotify-style mode, full background is deeply blurred ambient cover.
+        // In Full Poster mode, full-bleed sharp cover is rendered in upper canvas.
         AsyncImage(
             model = track.artwork,
             contentDescription = track.title,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (isSpotifyStyleCover) {
+                        Modifier
+                            .scale(1.25f)
+                            .blur(55.dp)
+                    } else {
+                        Modifier
+                    }
+                )
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) {
+                    isSpotifyStyleCover = !isSpotifyStyleCover
+                }
+                .testTag("now_playing_artwork_toggle"),
             contentScale = ContentScale.Crop
         )
 
-        // Dark gradient scrim overlay (Clear at top, darker at controls)
+        // 2. Smooth Progressive Mask Blur Below Seekbar ("mask style blur rudus seekbar se neche")
+        // Uses full-screen aligned artwork with Offscreen DstIn vertical gradient alpha mask
+        // so there is NEVER a hard horizontal line and the blur feathers in smoothly around/below the seekbar.
+        AsyncImage(
+            model = track.artwork,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    compositingStrategy = CompositingStrategy.Offscreen
+                }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                0.64f to Color.Transparent,
+                                0.74f to Color.Black.copy(alpha = 0.65f),
+                                0.84f to Color.Black,
+                                1.0f to Color.Black
+                            )
+                        ),
+                        blendMode = BlendMode.DstIn
+                    )
+                }
+                .blur(28.dp),
+            contentScale = ContentScale.Crop
+        )
+
+        // Smooth bottom dark scrim starting gently around the track title & seekbar down to the bottom controls
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.35f),
-                            Color.Black.copy(alpha = 0.15f),
-                            Color.Black.copy(alpha = 0.45f),
-                            Color.Black.copy(alpha = 0.82f),
-                            Color.Black.copy(alpha = 0.96f)
+                        colorStops = arrayOf(
+                            0.0f to Color.Transparent,
+                            0.56f to Color.Transparent,
+                            0.68f to Color.Black.copy(alpha = 0.38f),
+                            0.78f to Color.Black.copy(alpha = 0.72f),
+                            0.90f to Color(0xFF07080A).copy(alpha = 0.90f),
+                            1.0f to Color(0xFF050608).copy(alpha = 0.96f)
                         )
                     )
                 )
         )
 
-        // Foreground UI Elements
+        // Subtle top vignette for header readability
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.55f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // 3. Foreground UI Elements
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1084,75 +1270,81 @@ fun ImmersivePosterNowPlayingLayout(
                 .padding(horizontal = 22.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar: Down Chevron (Back), Center NOW PLAYING + Title, Right Share
-            Row(
+            // Top Bar: Close arrow & Share icon removed — Clean centered NOW PLAYING + Track title
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 6.dp, start = 16.dp, end = 16.dp)
             ) {
-                Surface(
-                    onClick = onDismiss,
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.45f),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 12.dp)
-                ) {
-                    Text(
-                        text = "NOW PLAYING",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = Color.White.copy(alpha = 0.65f),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp,
-                            fontSize = 10.5.sp
-                        )
+                Text(
+                    text = "NOW PLAYING",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color.White.copy(alpha = 0.68f),
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.4.sp,
+                        fontSize = 10.5.sp
                     )
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        ),
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee()
-                    )
-                }
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier.basicMarquee()
+                )
+            }
 
-                Surface(
-                    onClick = onShare,
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.45f),
-                    modifier = Modifier.size(40.dp)
+            // Center Interactive Artwork Area:
+            // Tapping switches between Full-Bleed Poster Cover and Spotify-Style Square Art Cover
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        isSpotifyStyleCover = !isSpotifyStyleCover
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isSpotifyStyleCover,
+                    enter = fadeIn(tween(280)) + scaleIn(initialScale = 0.86f, animationSpec = tween(320, easing = FastOutSlowInEasing)),
+                    exit = fadeOut(tween(220)) + scaleOut(targetScale = 0.90f, animationSpec = tween(240))
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.Share,
-                            contentDescription = "Share",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                    // Spotify-Style Centered Square Album Cover Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.88f)
+                            .aspectRatio(1f)
+                            .shadow(
+                                elevation = 28.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                spotColor = dynamicColors.primary.copy(alpha = 0.55f)
+                            )
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF16191D))
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.14f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                    ) {
+                        AsyncImage(
+                            model = track.artwork,
+                            contentDescription = track.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
                         )
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
 
             // Error Banner if any
             if (errorMessage != null) {
@@ -1180,7 +1372,7 @@ fun ImmersivePosterNowPlayingLayout(
                 }
             }
 
-            // Track Title & Artist Info with Like & More Buttons (Photo 1 exact layout)
+            // Track Title & Artist Info with Like & More Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -1192,7 +1384,10 @@ fun ImmersivePosterNowPlayingLayout(
                 ) {
                     Text(
                         text = track.title,
+                        fontFamily = AppFontFamily,
+                        fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.headlineMedium.copy(
+                            fontFamily = AppFontFamily,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -1204,7 +1399,13 @@ fun ImmersivePosterNowPlayingLayout(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = track.artist,
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
                         style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = AppFontFamily,
+                            fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.Normal,
                             fontSize = 15.sp,
                             color = Color.White.copy(alpha = 0.8f)
                         ),
@@ -1220,8 +1421,9 @@ fun ImmersivePosterNowPlayingLayout(
                     IconButton(
                         onClick = onToggleLike,
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(48.dp)
                             .scale(likeScale)
+                            .testTag("now_playing_like_button")
                     ) {
                         Icon(
                             imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
@@ -1233,7 +1435,9 @@ fun ImmersivePosterNowPlayingLayout(
 
                     IconButton(
                         onClick = onMoreOptions,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("now_playing_more_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.MoreHoriz,
@@ -1247,49 +1451,67 @@ fun ImmersivePosterNowPlayingLayout(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Smooth Slim Custom Progress Slider
+            // Splash-Screen Loading Progress Style Seekbar ("seekbar jo splash screen me loading progress tha wahi use")
             Column(modifier = Modifier.fillMaxWidth()) {
+                val safeDuration = totalDurationMs.toFloat().coerceAtLeast(1f)
+                val progressFraction = (displayPositionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
+                var barWidthPx by remember { mutableFloatStateOf(1f) }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(20.dp),
-                    contentAlignment = Alignment.Center
+                        .height(28.dp)
+                        .onSizeChanged { size ->
+                            barWidthPx = size.width.toFloat().coerceAtLeast(1f)
+                        }
+                        .pointerInput(safeDuration) {
+                            detectTapGestures { offset ->
+                                val fraction = (offset.x / barWidthPx).coerceIn(0f, 1f)
+                                onSeek(fraction * safeDuration)
+                                onSeekFinished()
+                            }
+                        }
+                        .pointerInput(safeDuration) {
+                            detectHorizontalDragGestures(
+                                onDragStart = { offset ->
+                                    val fraction = (offset.x / barWidthPx).coerceIn(0f, 1f)
+                                    onSeek(fraction * safeDuration)
+                                },
+                                onHorizontalDrag = { change, _ ->
+                                    change.consume()
+                                    val fraction = (change.position.x / barWidthPx).coerceIn(0f, 1f)
+                                    onSeek(fraction * safeDuration)
+                                },
+                                onDragEnd = {
+                                    onSeekFinished()
+                                },
+                                onDragCancel = {
+                                    onSeekFinished()
+                                }
+                            )
+                        }
+                        .testTag("now_playing_splash_seekbar"),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    Slider(
-                        value = displayPositionMs.toFloat(),
-                        onValueChange = onSeek,
-                        onValueChangeFinished = onSeekFinished,
-                        valueRange = 0f..totalDurationMs.toFloat().coerceAtLeast(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.28f)
-                        ),
-                        thumb = {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .shadow(2.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
-                        },
-                        track = { sliderState ->
-                            SliderDefaults.Track(
-                                sliderState = sliderState,
-                                modifier = Modifier.height(3.dp),
-                                colors = SliderDefaults.colors(
-                                    activeTrackColor = Color.White,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.28f)
-                                ),
-                                drawStopIndicator = null
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // Pure White Splash-Screen Style Seekbar ("seekbar white color no any color")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.24f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(progressFraction)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                        )
+                    }
                 }
 
-                // Time Row: Elapsed, Audio format badge (WEBM / 320 KBPS), Remaining Time
+                // Time Row: Elapsed, Audio format badge (WEBM HD / AAC 320), Remaining Time
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1408,7 +1630,7 @@ fun ImmersivePosterNowPlayingLayout(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Bottom Dock Pills: Queue/Lyrics & Speaker Cast
+            // Bottom Dock: Square FAB Style Queue & Lyrics + Real-time Connected Audio Output Device
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1416,931 +1638,119 @@ fun ImmersivePosterNowPlayingLayout(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Queue Button - Square FAB Style
                     Surface(
                         onClick = onOpenQueue,
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.16f)
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White.copy(alpha = 0.18f),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.22f),
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .testTag("now_playing_queue_fab")
                     ) {
                         Box(
-                            modifier = Modifier.size(46.dp),
+                            modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                                 contentDescription = "Queue",
                                 tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
 
+                    // Lyrics Button - Square FAB Style
                     Surface(
                         onClick = onOpenLyrics,
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.16f)
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White.copy(alpha = 0.18f),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.22f),
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .testTag("now_playing_lyrics_fab")
                     ) {
                         Box(
-                            modifier = Modifier.size(46.dp),
+                            modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Lyrics,
                                 contentDescription = "Lyrics",
                                 tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-
-                Surface(
-                    onClick = onOpenDeviceSelector,
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White.copy(alpha = 0.16f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.VolumeUp,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Speaker",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 13.sp
-                            )
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 2. VINYL DISC NOW PLAYING LAYOUT (Photo 2)
- * Circular rotating vinyl artwork with quick action tool row (Radio, Download, Sleep, More),
- * large squircle play button, and bottom shuffle/heart/repeat row.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun VinylDiscNowPlayingLayout(
-    track: PlayableTrack,
-    isPlaying: Boolean,
-    isBuffering: Boolean,
-    displayPositionMs: Long,
-    totalDurationMs: Long,
-    formatTime: (Long) -> String,
-    isLiked: Boolean,
-    likeScale: Float,
-    isShuffle: Boolean,
-    repeatMode: RepeatMode,
-    isDownloading: Boolean,
-    isDownloaded: Boolean,
-    downloadProgress: Int,
-    errorMessage: String?,
-    dynamicColors: DynamicSongColors,
-    onDismiss: () -> Unit,
-    onToggleLike: () -> Unit,
-    onToggleShuffle: () -> Unit,
-    onToggleRepeat: () -> Unit,
-    onDownload: () -> Unit,
-    onRadio: () -> Unit,
-    onSleepTimer: () -> Unit,
-    onMoreOptions: () -> Unit,
-    onSeek: (Float) -> Unit,
-    onSeekFinished: () -> Unit,
-    onPrevious: () -> Unit,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
-    onRetry: () -> Unit,
-    onOpenQueue: () -> Unit
-) {
-    // Rotating Vinyl Disc Animation when playing
-    val infiniteTransition = rememberInfiniteTransition(label = "vinyl_rotate")
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(12000, easing = LinearEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF141712))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 22.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Header: Down Chevron (Back) + Center NOW PLAYING & Title + Right Share
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "Back",
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 12.dp)
-                ) {
-                    Text(
-                        text = "NOW PLAYING",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp,
-                            fontSize = 10.5.sp
-                        )
-                    )
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        ),
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee()
-                    )
-                }
-
-                IconButton(onClick = onMoreOptions) {
-                    Icon(
-                        imageVector = Icons.Rounded.Share,
-                        contentDescription = "Share",
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Center: Circular Vinyl Disc Art with Realistic Grooves & Soft Glow
-            Box(
-                modifier = Modifier
-                    .size(245.dp)
-                    .shadow(24.dp, shape = CircleShape, spotColor = dynamicColors.primary.copy(alpha = 0.5f))
-                    .clip(CircleShape)
-                    .background(Color(0xFF0D0F0D))
-                    .border(3.dp, Color(0xFF2A3026), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                // Vinyl Groove Lines
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val radiusStep = size.minDimension / 14
-                    for (i in 1..6) {
-                        drawCircle(
-                            color = Color.White.copy(alpha = 0.04f),
-                            radius = size.minDimension / 2 - (i * radiusStep),
-                            style = Stroke(width = 1.dp.toPx())
-                        )
-                    }
-                }
-
-                // Center Album Art (Rotates smoothly when playing)
-                Box(
-                    modifier = Modifier
-                        .size(190.dp)
-                        .clip(CircleShape)
-                        .scale(1f)
-                ) {
-                    AsyncImage(
-                        model = track.artwork,
-                        contentDescription = track.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-                // Center spindle hole
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF141712))
-                        .border(1.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Track Title & Artist (Center Aligned as in Photo 2)
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = Color.White
-                    ),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    modifier = Modifier.basicMarquee()
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = track.artist,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 14.5.sp
-                    ),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Quick Action Tool Row: [Radio, Download, Sleep, More] (Photo 2 exact style)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 1. Radio / Reco pill
-                Surface(
-                    onClick = onRadio,
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    contentColor = Color.Black,
-                    modifier = Modifier.size(width = 54.dp, height = 44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.Radio,
-                            contentDescription = "Radio Mix",
-                            tint = Color.Black,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // 2. Download pill
-                Surface(
-                    onClick = onDownload,
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isDownloaded) Color(0xFF10B981) else Color.White,
-                    contentColor = if (isDownloaded) Color.White else Color.Black,
-                    modifier = Modifier.size(width = 54.dp, height = 44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (isDownloading) {
-                            CircularProgressIndicator(
-                                progress = { (downloadProgress / 100f).coerceIn(0f, 1f) },
-                                modifier = Modifier.size(20.dp),
-                                color = Color.Black,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (isDownloaded) com.example.ui.theme.AppIcons.DownloadForOffline else com.example.ui.theme.AppIcons.Download,
-                                contentDescription = "Download",
-                                tint = if (isDownloaded) Color.White else Color.Black,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 }
 
-                // 3. Sleep Timer pill
-                Surface(
-                    onClick = onSleepTimer,
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    contentColor = Color.Black,
-                    modifier = Modifier.size(width = 54.dp, height = 44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.Bedtime,
-                            contentDescription = "Sleep Timer",
-                            tint = Color.Black,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // 4. More options pill
-                Surface(
-                    onClick = onMoreOptions,
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    contentColor = Color.Black,
-                    modifier = Modifier.size(width = 54.dp, height = 44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.MoreHoriz,
-                            contentDescription = "More",
-                            tint = Color.Black,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Progress Slider Row with Time stamps
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Slider(
-                        value = displayPositionMs.toFloat(),
-                        onValueChange = onSeek,
-                        onValueChangeFinished = onSeekFinished,
-                        valueRange = 0f..totalDurationMs.toFloat().coerceAtLeast(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.25f)
-                        ),
-                        thumb = {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .shadow(2.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
-                        },
-                        track = { sliderState ->
-                            SliderDefaults.Track(
-                                sliderState = sliderState,
-                                modifier = Modifier.height(3.dp),
-                                colors = SliderDefaults.colors(
-                                    activeTrackColor = Color.White,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.25f)
-                                ),
-                                drawStopIndicator = null
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = formatTime(displayPositionMs),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                    Text(
-                        text = formatTime(totalDurationMs),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Main Playback Controls: Prev, Squircle Play/Pause, Next
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onPrevious,
-                    modifier = Modifier.size(54.dp)
-                ) {
-                    Icon(
-                        imageVector = AppIcons.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-
-                // Large Squircle Play Button (Photo 2)
-                Surface(
-                    onClick = onPlayPause,
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.size(76.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (isBuffering) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(32.dp),
-                                color = Color.Black,
-                                strokeWidth = 3.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = Color.Black,
-                                modifier = Modifier.size(40.dp)
-                            )
-                        }
-                    }
-                }
-
-                IconButton(
-                    onClick = onNext,
-                    modifier = Modifier.size(54.dp)
-                ) {
-                    Icon(
-                        imageVector = AppIcons.SkipNext,
-                        contentDescription = "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Bottom Action Row: Shuffle, Heart/Like, Repeat (Photo 2)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onToggleShuffle) {
-                    Icon(
-                        imageVector = Icons.Rounded.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (isShuffle) Color(0xFF6EE7B7) else Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onToggleLike,
-                    modifier = Modifier.scale(likeScale)
-                ) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isLiked) Color(0xFFFF4D6D) else Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-
-                IconButton(onClick = onToggleRepeat) {
-                    val icon = if (repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = "Repeat",
-                        tint = if (repeatMode != RepeatMode.OFF) Color(0xFF6EE7B7) else Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            // Bottom Expand Chevron for Queue
-            IconButton(
-                onClick = onOpenQueue,
-                modifier = Modifier.padding(top = 4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowUp,
-                    contentDescription = "Open Queue",
-                    tint = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * 3. MODERN CARD NOW PLAYING LAYOUT (Photo 3)
- * Classic elevated rounded square album card, top "NOW PLAYING" header,
- * 5-button studio control row, and bottom sheet drag indicator.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ModernCardNowPlayingLayout(
-    track: PlayableTrack,
-    isPlaying: Boolean,
-    isBuffering: Boolean,
-    displayPositionMs: Long,
-    totalDurationMs: Long,
-    formatTime: (Long) -> String,
-    isLiked: Boolean,
-    likeScale: Float,
-    isShuffle: Boolean,
-    repeatMode: RepeatMode,
-    errorMessage: String?,
-    dynamicColors: DynamicSongColors,
-    onDismiss: () -> Unit,
-    onToggleLike: () -> Unit,
-    onToggleShuffle: () -> Unit,
-    onToggleRepeat: () -> Unit,
-    onMoreOptions: () -> Unit,
-    onSeek: (Float) -> Unit,
-    onSeekFinished: () -> Unit,
-    onPrevious: () -> Unit,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
-    onRetry: () -> Unit,
-    onOpenQueue: () -> Unit,
-    onOpenLyrics: () -> Unit,
-    onOpenDeviceSelector: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF101311))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 22.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Bar: Down Chevron (Back), Center NOW PLAYING + Title, Right Share
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-                ) {
-                    Text(
-                        text = "NOW PLAYING",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp,
-                            fontSize = 10.5.sp
-                        )
-                    )
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        ),
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee()
-                    )
-                }
-
-                IconButton(onClick = onMoreOptions) {
-                    Icon(
-                        imageVector = Icons.Rounded.Share,
-                        contentDescription = "Share",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Large Elevated Rounded Square Album Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .shadow(
-                        elevation = 20.dp,
-                        shape = RoundedCornerShape(26.dp),
-                        spotColor = dynamicColors.primary.copy(alpha = 0.4f)
-                    )
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(Color(0xFF1E221F))
-            ) {
-                AsyncImage(
-                    model = track.artwork,
-                    contentDescription = track.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            Spacer(modifier = Modifier.height(22.dp))
-
-            // Title, Artist and Heart Favorite Button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 23.sp,
-                            color = Color.White
-                        ),
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee()
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = track.artist,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 15.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                IconButton(
-                    onClick = onToggleLike,
-                    modifier = Modifier.scale(likeScale)
-                ) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isLiked) Color(0xFFFF4D6D) else Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Progress Slider & Timestamps
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Slider(
-                        value = displayPositionMs.toFloat(),
-                        onValueChange = onSeek,
-                        onValueChangeFinished = onSeekFinished,
-                        valueRange = 0f..totalDurationMs.toFloat().coerceAtLeast(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.28f)
-                        ),
-                        thumb = {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .shadow(2.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
-                        },
-                        track = { sliderState ->
-                            SliderDefaults.Track(
-                                sliderState = sliderState,
-                                modifier = Modifier.height(3.dp),
-                                colors = SliderDefaults.colors(
-                                    activeTrackColor = Color.White,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.28f)
-                                ),
-                                drawStopIndicator = null
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = formatTime(displayPositionMs),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                    Text(
-                        text = formatTime(totalDurationMs),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 5-Button Primary Controls Row: Shuffle, Prev, Big Circle Play, Next, Repeat
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onToggleShuffle) {
-                    Icon(
-                        imageVector = Icons.Rounded.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (isShuffle) Color(0xFF6EE7B7) else Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onPrevious,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = AppIcons.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-
-                Surface(
-                    onClick = onPlayPause,
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 10.dp,
-                    modifier = Modifier.size(72.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (isBuffering) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(30.dp),
-                                color = Color.Black,
-                                strokeWidth = 3.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = Color.Black,
-                                modifier = Modifier.size(38.dp)
-                            )
-                        }
-                    }
-                }
-
-                IconButton(
-                    onClick = onNext,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = AppIcons.SkipNext,
-                        contentDescription = "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-
-                IconButton(onClick = onToggleRepeat) {
-                    val icon = if (repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = "Repeat",
-                        tint = if (repeatMode != RepeatMode.OFF) Color(0xFF6EE7B7) else Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Bottom row dock with device selector & queue/lyrics
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                // Real-time Audio Output Device Square FAB Pill
+                // Automatically displays connected Bluetooth speaker/headphones/USB name in real-time or "Speaker"
                 Surface(
                     onClick = onOpenDeviceSelector,
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White.copy(alpha = 0.12f)
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (activeAudioDevice.isExternalConnected) {
+                        dynamicColors.primary.copy(alpha = 0.28f)
+                    } else {
+                        Color.White.copy(alpha = 0.18f)
+                    },
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .height(48.dp)
+                        .border(
+                            width = 1.dp,
+                            color = if (activeAudioDevice.isExternalConnected) {
+                                dynamicColors.primary.copy(alpha = 0.55f)
+                            } else {
+                                Color.White.copy(alpha = 0.22f)
+                            },
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .testTag("now_playing_speaker_device_fab")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        if (activeAudioDevice.isExternalConnected) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF34D399))
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
+                        }
                         Icon(
-                            imageVector = Icons.Outlined.SpeakerGroup,
-                            contentDescription = null,
+                            imageVector = activeAudioDevice.icon,
+                            contentDescription = activeAudioDevice.name,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(19.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "This Device",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            text = activeAudioDevice.name,
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
-                                fontSize = 12.sp
-                            )
+                                fontSize = 13.5.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 150.dp)
                         )
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(
-                        onClick = onOpenLyrics,
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.White.copy(alpha = 0.12f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Lyrics, contentDescription = "Lyrics", tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Lyrics", color = Color.White, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold))
-                        }
-                    }
-
-                    Surface(
-                        onClick = onOpenQueue,
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.White.copy(alpha = 0.12f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = "Queue", tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Queue", color = Color.White, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold))
-                        }
                     }
                 }
             }
@@ -2743,7 +2153,9 @@ fun SongOptionsBottomSheet(
     onShowQueue: () -> Unit,
     onShowLyrics: () -> Unit,
     onShowCredits: () -> Unit,
+    onOpenEqualizer: () -> Unit = {},
     onDownload: () -> Unit,
+    onStartRadio: () -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
     onViewAlbum: () -> Unit,
     onShare: () -> Unit,
@@ -2783,133 +2195,223 @@ fun SongOptionsBottomSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = track.title,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        fontFamily = AppFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = AppFontFamily,
+                            fontWeight = FontWeight.Bold
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = track.artist,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFontFamily,
+                            fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            // 1. Volume Control Bar (Full Flat Style, No Large Rounded Start & End)
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shadowElevation = 0.dp,
-                border = null,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val volIcon = when {
-                        volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeMute
-                        volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-                        else -> Icons.AutoMirrored.Filled.VolumeUp
-                    }
-                    IconButton(
-                        onClick = {
-                            if (volume > 0.05f) onVolumeChange(0f) else onVolumeChange(0.8f)
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = volIcon,
-                            contentDescription = "Volume",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    Slider(
-                        value = volume.coerceIn(0f, 1f),
-                        onValueChange = onVolumeChange,
-                        valueRange = 0f..1f,
-                        modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${(volume * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.widthIn(min = 36.dp),
-                        textAlign = TextAlign.End
-                    )
-                }
-            }
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
+            )
 
-            // 2. Mini Action Bar (Full Flat Style, No Large Rounded Start & End)
+            // Segmented 3-Card Row: Like (Start Rounding), Download (Middle), Add to Playlist (Last Rounding)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Like Mini Card
-                MiniActionPill(
-                    icon = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    label = if (isLiked) "Liked" else "Like",
-                    isActive = isLiked,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    onClick = onToggleLike,
-                    modifier = Modifier.weight(1f)
+                // 1. Like Card (Start Rounding)
+                val likeShape = RoundedCornerShape(
+                    topStart = 24.dp,
+                    bottomStart = 24.dp,
+                    topEnd = 6.dp,
+                    bottomEnd = 6.dp
                 )
+                Surface(
+                    onClick = onToggleLike,
+                    shape = likeShape,
+                    color = if (isLiked) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = if (isLiked) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                        }
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp)
+                        .testTag("song_options_card_like")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = if (isLiked) "Liked" else "Like",
+                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (isLiked) "Liked" else "Like",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
 
-                // Download Mini Card
-                val dlLabel = when {
+                // 2. Download Card (Middle)
+                val downloadShape = RoundedCornerShape(6.dp)
+                val dlActive = isDownloaded || isDownloading
+                val dlTitle = when {
                     isDownloading -> "$downloadProgress%"
-                    isDownloaded -> "Saved"
+                    isDownloaded -> "Downloaded"
                     else -> "Download"
                 }
-                MiniActionPill(
-                    icon = when {
-                        isDownloaded -> com.example.ui.theme.AppIcons.DownloadForOffline
-                        isDownloading -> com.example.ui.theme.AppIcons.Download
-                        else -> com.example.ui.theme.AppIcons.Download
-                    },
-                    label = dlLabel,
-                    isActive = isDownloaded || isDownloading,
-                    activeColor = MaterialTheme.colorScheme.primary,
+                Surface(
                     onClick = onDownload,
-                    modifier = Modifier.weight(1f)
-                )
+                    shape = downloadShape,
+                    color = if (dlActive) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = if (dlActive) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                        }
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp)
+                        .testTag("song_options_card_download")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = when {
+                                isDownloading -> Icons.Outlined.Downloading
+                                isDownloaded -> com.example.ui.theme.AppIcons.DownloadForOffline
+                                else -> com.example.ui.theme.AppIcons.Download
+                            },
+                            contentDescription = dlTitle,
+                            tint = if (dlActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = dlTitle,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (dlActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
 
-                // Add to Playlist Mini Card
-                MiniActionPill(
-                    icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                    label = "Playlist",
-                    isActive = false,
-                    activeColor = MaterialTheme.colorScheme.primary,
+                // 3. Add to Playlist Card (Last Rounding)
+                val playlistShape = RoundedCornerShape(
+                    topStart = 6.dp,
+                    bottomStart = 6.dp,
+                    topEnd = 24.dp,
+                    bottomEnd = 24.dp
+                )
+                Surface(
                     onClick = onAddToPlaylist,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // Share Mini Card
-                MiniActionPill(
-                    icon = Icons.AutoMirrored.Rounded.Send,
-                    label = "Share",
-                    isActive = false,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    onClick = onShare,
-                    modifier = Modifier.weight(1f)
-                )
+                    shape = playlistShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp)
+                        .testTag("song_options_card_add_to_playlist")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                            contentDescription = "Add to Playlist",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Add to Playlist",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
 
-            // 3. Option Items (Removed Duplicate Like, Download, Playlist, Share)
+            // Clean Option Items List (Like, Download, Add to Playlist removed from line below)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
+                OptionItem(
+                    icon = Icons.Outlined.Equalizer,
+                    title = "Equalizer",
+                    tint = MaterialTheme.colorScheme.primary,
+                    onClick = onOpenEqualizer
+                )
+
+                OptionItem(
+                    icon = Icons.Outlined.Radio,
+                    title = "Start Song Radio",
+                    tint = MaterialTheme.colorScheme.primary,
+                    onClick = onStartRadio
+                )
+
                 OptionItem(
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     title = "Up Next (Queue)",
@@ -2953,6 +2455,12 @@ fun SongOptionsBottomSheet(
                     icon = Icons.Outlined.Info,
                     title = "View Song Credits",
                     onClick = onShowCredits
+                )
+
+                OptionItem(
+                    icon = Icons.AutoMirrored.Rounded.Send,
+                    title = "Share",
+                    onClick = onShare
                 )
             }
         }
@@ -3480,6 +2988,9 @@ fun QueueBottomSheet(
     queue: List<PlayableTrack>,
     currentIndex: Int,
     isPlaying: Boolean = true,
+    isAutoplayEnabled: Boolean = true,
+    onToggleAutoplay: () -> Unit = {},
+    onLoadMoreRecommendations: () -> Unit = {},
     onDismiss: () -> Unit,
     onSelectTrack: (Int) -> Unit,
     onRemoveTrack: (Int) -> Unit,
@@ -3502,13 +3013,93 @@ fun QueueBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Playing Queue (${queue.size})",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                )
-                if (queue.isNotEmpty()) {
-                    TextButton(onClick = onClearQueue) {
-                        Text("Clear", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Column {
+                    Text(
+                        text = "Playing Queue (${queue.size})",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        text = if (isAutoplayEnabled) "Auto-Radio Mix Enabled" else "Auto-Play Disabled",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = if (isAutoplayEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (queue.isNotEmpty()) {
+                        TextButton(onClick = onClearQueue) {
+                            Text("Clear", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+
+            // Quick Auto-Play / Radio Controls Card
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isAutoplayEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Radio,
+                                    contentDescription = null,
+                                    tint = if (isAutoplayEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Infinite Auto-Radio",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "Auto-append similar songs",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onLoadMoreRecommendations) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Load Recommendations",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Switch(
+                            checked = isAutoplayEnabled,
+                            onCheckedChange = { onToggleAutoplay() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary
+                            )
+                        )
                     }
                 }
             }
@@ -3571,8 +3162,11 @@ fun QueueBottomSheet(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = track.title,
+                                    fontFamily = AppFontFamily,
+                                    fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                        fontFamily = AppFontFamily,
+                                        fontWeight = FontWeight.Bold,
                                         color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                     ),
                                     maxLines = 1,
@@ -3580,7 +3174,13 @@ fun QueueBottomSheet(
                                 )
                                 Text(
                                     text = track.artist,
+                                    fontFamily = AppFontFamily,
+                                    fontStyle = FontStyle.Italic,
+                                    fontWeight = FontWeight.Normal,
                                     style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = AppFontFamily,
+                                        fontStyle = FontStyle.Italic,
+                                        fontWeight = FontWeight.Normal,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     ),
                                     maxLines = 1,

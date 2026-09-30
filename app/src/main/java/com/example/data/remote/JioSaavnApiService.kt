@@ -176,4 +176,16 @@ interface JioSaavnApiService {
     suspend fun getRecommendations(
         @Query("pid") pid: String
     ): Response<JsonElement>
+
+    // 13. WebRadio Station API
+    @GET("api.php?__call=webradio.createEntityStation&entity_type=queue&_format=json&_marker=0&api_version=4&ctx=web6dot0")
+    suspend fun createRadioStation(
+        @Query("entity_id") entityId: String
+    ): Response<JsonElement>
+
+    @GET("api.php?__call=webradio.getSong&_format=json&_marker=0&api_version=4&ctx=web6dot0")
+    suspend fun getRadioSongs(
+        @Query("stationid") stationId: String,
+        @Query("k") count: Int = 20
+    ): Response<JsonElement>
 }

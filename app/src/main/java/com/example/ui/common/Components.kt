@@ -21,12 +21,48 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.*
+import com.example.ui.theme.AppFontFamily
+
+@Composable
+fun MusicItem(
+    title: String = "Starboy",
+    artist: String = "The Weeknd",
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    artistColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        // Bold Song Title
+        Text(
+            text = title,
+            fontFamily = AppFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            color = titleColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Italic Artist Name
+        Text(
+            text = artist,
+            fontFamily = AppFontFamily,
+            fontStyle = FontStyle.Italic,
+            fontWeight = FontWeight.Normal,
+            fontSize = 14.sp,
+            color = artistColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
 
 @Composable
 fun ShimmerPlaceholder(
@@ -225,7 +261,10 @@ fun SongRowItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
+                    fontFamily = AppFontFamily,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = AppFontFamily,
                         fontWeight = FontWeight.Bold,
                         color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     ),
@@ -235,7 +274,13 @@ fun SongRowItem(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = song.artist,
+                    fontFamily = AppFontFamily,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.Normal,
                     style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     maxLines = 1,
@@ -290,7 +335,10 @@ fun AlbumCard(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = album.title,
+            fontFamily = AppFontFamily,
+            fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleSmall.copy(
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.5.sp
             ),
@@ -298,6 +346,24 @@ fun AlbumCard(
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface
         )
+        if (album.artist.isNotBlank()) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = album.artist,
+                fontFamily = AppFontFamily,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.Normal,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = AppFontFamily,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -388,7 +454,7 @@ fun ArtistCard(
             0 -> listOf(Color(0xFF8B5CF6), Color(0xFF6366F1)) // Purple to Indigo
             1 -> listOf(Color(0xFFF43F5E), Color(0xFFE11D48)) // Rose to Crimson
             2 -> listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8)) // Blue to Navy
-            3 -> listOf(Color(0xFF10B981), Color(0xFF059669)) // Emerald to Teal
+            3 -> listOf(Color(0xFF06B6D4), Color(0xFF0284C7)) // Cyan to Ocean Blue
             4 -> listOf(Color(0xFFF59E0B), Color(0xFFD97706)) // Amber to Orange
             else -> listOf(Color(0xFFEC4899), Color(0xFF9333EA)) // Pink to Violet
         }

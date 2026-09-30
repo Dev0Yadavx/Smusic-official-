@@ -544,24 +544,103 @@ class MusicRepository(
     }
 
     /**
-     * Recommendations / Autoplay next songs
+     * Recommendations / Autoplay next songs (Endless Radio Engine)
      */
-    suspend fun getRecommendations(songId: String): List<Song> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.getRecommendations(pid = songId)
-            if (response.isSuccessful && response.body() != null) {
-                val songs = RecommendationMapper.map(response.body()!!)
-                if (songs.isNotEmpty()) return@withContext songs
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e(tag, "Recommendations error: ${e.message}")
+    suspend fun getRecommendations(songId: String, currentTrack: PlayableTrack? = null): List<Song> = withContext(Dispatchers.IO) {
+        val targetPid = if (songId.all { it.isDigit() }) {
+            songId
+        } else {
+            // Lookup numeric PID from token / custom ID
+            val details = getSongDetails(songId)
+            details?.id?.takeIf { it.all { ch -> ch.isDigit() } } ?: songId
         }
-        // Fallback: use trending songs or cached home shelf if available
-        cachedShelves.firstOrNull { it.id == "trending" }?.items?.mapNotNull {
-            if (it is ShelfItem.SongItem) it.song else null
-        } ?: emptyList()
+
+        if (targetPid.isNotBlank()) {
+            try {
+                // 1. Direct Recommendation Queue
+                val response = api.getRecommendations(pid = targetPid)
+                if (response.isSuccessful && response.body() != null) {
+                    val songs = RecommendationMapper.map(response.body()!!)
+                    if (songs.isNotEmpty()) {
+                        return@withContext songs.filter { it.id != targetPid }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(tag, "Direct recommendation error for pid $targetPid: ${e.message}")
+            }
+
+            try {
+                // 2. AutoPlay queue fallback
+                val autoPlayResp = api.getAutoPlayQueue(songId = targetPid)
+                if (autoPlayResp.isSuccessful && autoPlayResp.body() != null) {
+                    val songs = RecommendationMapper.map(autoPlayResp.body()!!)
+                    if (songs.isNotEmpty()) {
+                        return@withContext songs.filter { it.id != targetPid }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            try {
+                // 3. WebRadio Station fallback
+                val radioResp = api.createRadioStation(entityId = targetPid)
+                if (radioResp.isSuccessful && radioResp.body() != null) {
+                    val radioObj = radioResp.body()!!.let { if (it.isJsonObject) it.asJsonObject else null }
+                    val stationId = radioObj?.get("stationid")?.asString
+                    if (!stationId.isNullOrBlank()) {
+                        val stationSongsResp = api.getRadioSongs(stationId = stationId, count = 25)
+                        if (stationSongsResp.isSuccessful && stationSongsResp.body() != null) {
+                            val stationSongs = RecommendationMapper.map(stationSongsResp.body()!!)
+                            if (stationSongs.isNotEmpty()) {
+                                return@withContext stationSongs.filter { it.id != targetPid }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 4. Artist top songs fallback for high-relevance radio continuation
+        val artistQuery = currentTrack?.artist ?: ""
+        if (artistQuery.isNotBlank() && !artistQuery.equals("Unknown", ignoreCase = true) && !artistQuery.equals("Various Artists", ignoreCase = true)) {
+            try {
+                val primaryArtist = artistQuery.split(",", "&", "feat.", "ft.").firstOrNull()?.trim() ?: artistQuery
+                val artistSearchResult = searchSongs(query = primaryArtist, limit = 25)
+                if (artistSearchResult is NetworkResult.Success && artistSearchResult.data.isNotEmpty()) {
+                    val filtered = artistSearchResult.data.filter { it.id != targetPid && it.id != songId }
+                    if (filtered.isNotEmpty()) {
+                        return@withContext filtered
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 5. Final fallback: use trending songs or cached home shelf if available
+        val trendingSongs = cachedShelves.firstOrNull { it.id == "trending" || it.id.contains("trending", ignoreCase = true) }
+            ?.items?.mapNotNull { if (it is ShelfItem.SongItem) it.song else null }
+            ?.filter { it.id != targetPid && it.id != songId }
+            ?: emptyList()
+
+        if (trendingSongs.isNotEmpty()) {
+            return@withContext trendingSongs
+        }
+
+        // 6. If even cached is empty, query fresh home launch songs
+        try {
+            val homeLaunch = api.getHomeLaunch()
+            if (homeLaunch.isSuccessful && homeLaunch.body() != null) {
+                val shelves = HomeMapper.map(homeLaunch.body()!!)
+                val firstSongs = shelves.flatMap { shelf ->
+                    shelf.items.mapNotNull { if (it is ShelfItem.SongItem) it.song else null }
+                }.filter { it.id != targetPid && it.id != songId }
+                if (firstSongs.isNotEmpty()) {
+                    return@withContext firstSongs
+                }
+            }
+        } catch (_: Exception) {}
+
+        emptyList()
     }
 
     /**
@@ -591,12 +670,28 @@ class MusicRepository(
     }
 
     /**
-     * Stream URL resolution
+     * Stream URL resolution (with automatic details lookup fallback)
      */
     suspend fun resolveStreamUrl(
         track: PlayableTrack,
         quality: StreamUrlResolver.AudioQuality = StreamUrlResolver.AudioQuality.HIGH
-    ): String? = StreamUrlResolver.resolve(track, quality)
+    ): String? = withContext(Dispatchers.IO) {
+        var resolved = StreamUrlResolver.resolve(track, quality)
+        if (resolved.isNullOrBlank() && track.source != TrackSource.LOCAL && track.id.isNotBlank()) {
+            // Proactively query song details if track was generated without encrypted media URL
+            val details = getSongDetails(track.id)
+            if (details != null && details.encryptedMediaUrl.isNotBlank()) {
+                val updatedTrack = track.copy(
+                    encryptedMediaUrl = details.encryptedMediaUrl,
+                    mediaPreviewUrl = details.mediaPreviewUrl,
+                    artwork = if (track.artwork.isBlank()) details.artwork else track.artwork,
+                    duration = if (track.duration <= 0) details.duration else track.duration
+                )
+                resolved = StreamUrlResolver.resolve(updatedTrack, quality)
+            }
+        }
+        resolved
+    }
 
     // --- LOCAL PERSISTENCE ---
 

@@ -1,24 +1,58 @@
 package com.example.ui.library
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
@@ -30,20 +64,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.R
-import com.musicx.app.utils.PlaylistLinkParser
-
-// JioSaavn Brand Accent Colors
-val JioSaavnGreen = Color(0xFF00D285)
-val JioSaavnDarkGreen = Color(0xFF053B2B)
-val JioSaavnTealGradient = listOf(Color(0xFF00E699), Color(0xFF00A86B), Color(0xFF0369A1))
 
 /**
- * M3 UI Box Dialog for JioSaavn Playlist Import
- * Features:
- * - M3 Dialog Box style ("m3 ui jase box open")
- * - Clean link input box with instant paste action ("link paste box")
- * - Sleek M3 horizontal linear loading line ("loding line style")
- * - Simple & focused controls ("import button bas")
+ * Compact Material 3 Dialog for Importing Playlists
+ * Small M3 UI style with large card-shaped icons, 1-tap clipboard paste, and zero green tint.
  */
 @Composable
 fun ImportPlaylistDialog(
@@ -58,8 +82,10 @@ fun ImportPlaylistDialog(
 
     Dialog(
         onDismissRequest = {
-            viewModel.resetImportState()
-            onDismiss()
+            if (!isLoading) {
+                viewModel.resetImportState()
+                onDismiss()
+            }
         },
         properties = DialogProperties(
             dismissOnBackPress = !isLoading,
@@ -69,11 +95,11 @@ fun ImportPlaylistDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .widthIn(max = 420.dp)
-                .clip(RoundedCornerShape(28.dp))
+                .fillMaxWidth(0.86f)
+                .widthIn(max = 350.dp)
+                .clip(RoundedCornerShape(26.dp))
                 .testTag("import_playlist_m3_dialog"),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(26.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
             border = BorderStroke(
@@ -84,144 +110,140 @@ fun ImportPlaylistDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 22.dp)
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
             ) {
-                // Header Row: JioSaavn Icon Badge + Title + Close Button
+                // Header Row: Card-styled Large Icon + Title + Close Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(Color(0xFF00D285), Color(0xFF00875A))
-                                )
-                            )
-                            .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        shape = RoundedCornerShape(13.dp),
+                        color = Color(0xFF00D285).copy(alpha = 0.16f),
+                        border = BorderStroke(
+                            1.dp,
+                            Color(0xFF00D285).copy(alpha = 0.30f)
+                        ),
+                        modifier = Modifier.size(44.dp)
                     ) {
-                        JioSaavnBubbleIcon(
-                            size = 28.dp,
-                            contentDescription = "JioSaavn"
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Import Playlist",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 19.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "JioSaavn link or token",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp
+                        Box(contentAlignment = Alignment.Center) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_jiosaavn),
+                                contentDescription = "JioSaavn",
+                                modifier = Modifier.size(26.dp)
                             )
-                        )
+                        }
                     }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Text(
+                        text = "Import Playlist",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 17.5.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
 
                     IconButton(
                         onClick = {
                             viewModel.resetImportState()
                             onDismiss()
                         },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Loading Line Style (Horizontal Linear Progress Bar)
+                // Smooth M3 Progress line indicator
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(4.dp)
+                        .height(3.dp)
                 ) {
                     if (isLoading) {
                         LinearProgressIndicator(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(4.dp)
+                                .height(3.dp)
                                 .clip(RoundedCornerShape(2.dp))
                                 .testTag("import_loading_line"),
-                            color = JioSaavnGreen,
-                            trackColor = JioSaavnGreen.copy(alpha = 0.20f)
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.primaryContainer
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 when (val state = importState) {
                     is ImportPlaylistUiState.Saved -> {
-                        // Success State Card
+                        // Success Card
                         Card(
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = JioSaavnGreen.copy(alpha = 0.12f)
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
                             ),
-                            border = BorderStroke(1.dp, JioSaavnGreen.copy(alpha = 0.35f)),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(18.dp),
+                                    .padding(16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .clip(CircleShape)
-                                        .background(JioSaavnGreen),
-                                    contentAlignment = Alignment.Center
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(46.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Color.Black,
-                                        modifier = Modifier.size(26.dp)
-                                    )
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(26.dp)
+                                        )
+                                    }
                                 }
 
                                 Text(
                                     text = "Playlist Imported!",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 17.sp
+                                        fontSize = 16.sp
                                     ),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 val songCountText = if (state.songCount > 0) " (${state.songCount} songs)" else ""
                                 Text(
-                                    text = "\"${state.title}\"$songCountText is now saved in your Library.",
+                                    text = "\"${state.title}\"$songCountText is saved in your Library.",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 13.sp
+                                        fontSize = 12.5.sp
                                     )
                                 )
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Button(
@@ -232,12 +254,12 @@ fun ImportPlaylistDialog(
                                         },
                                         shape = RoundedCornerShape(14.dp),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = JioSaavnGreen,
-                                            contentColor = Color.Black
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
                                         ),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Text("Open Playlist", fontWeight = FontWeight.Bold)
+                                        Text("Open", fontWeight = FontWeight.Bold)
                                     }
 
                                     OutlinedButton(
@@ -256,18 +278,19 @@ fun ImportPlaylistDialog(
                     }
 
                     else -> {
-                        // Link Paste Input Box
+                        // Link Input Field with large icons
                         OutlinedTextField(
                             value = inputUrl,
                             onValueChange = { inputUrl = it },
-                            label = { Text("Playlist Link") },
-                            placeholder = { Text("Paste JioSaavn link here...") },
+                            placeholder = { Text("Paste playlist link here...") },
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp),
                             leadingIcon = {
-                                JioSaavnBubbleIcon(
-                                    size = 22.dp,
-                                    contentDescription = null
+                                Icon(
+                                    imageVector = Icons.Rounded.Link,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
                                 )
                             },
                             trailingIcon = {
@@ -276,30 +299,17 @@ fun ImportPlaylistDialog(
                                         Icon(
                                             imageVector = Icons.Default.Clear,
                                             contentDescription = "Clear",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                } else {
-                                    IconButton(
-                                        onClick = {
-                                            val clip = clipboardManager.getText()?.text
-                                            if (!clip.isNullOrBlank()) {
-                                                inputUrl = clip.trim()
-                                            }
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ContentPaste,
-                                            contentDescription = "Paste",
-                                            tint = JioSaavnGreen
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
                             },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = JioSaavnGreen,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                                focusedLabelColor = JioSaavnGreen
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -308,73 +318,71 @@ fun ImportPlaylistDialog(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Quick Paste from Clipboard Action Chip
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            AssistChip(
-                                onClick = {
-                                    val clip = clipboardManager.getText()?.text
-                                    if (!clip.isNullOrBlank()) {
-                                        inputUrl = clip.trim()
-                                    }
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentPaste,
-                                        contentDescription = "Paste",
-                                        tint = JioSaavnGreen,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = "Paste from Clipboard",
-                                        fontWeight = FontWeight.Medium,
-                                        fontSize = 12.sp
-                                    )
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = JioSaavnGreen.copy(alpha = 0.12f),
-                                    labelColor = MaterialTheme.colorScheme.onSurface
-                                ),
-                                border = BorderStroke(1.dp, JioSaavnGreen.copy(alpha = 0.3f))
-                            )
-
-                            // Show token extraction badge if URL was recognized
-                            val parsedToken = remember(inputUrl) { PlaylistLinkParser.extractToken(inputUrl) }
-                            if (inputUrl.isNotBlank() && parsedToken != null && parsedToken != inputUrl) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Text(
-                                        text = "Token: $parsedToken",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = JioSaavnGreen,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
+                        // Large Card-Style "Paste from Clipboard" Action Button
+                        Surface(
+                            onClick = {
+                                val clip = clipboardManager.getText()?.text
+                                if (!clip.isNullOrBlank()) {
+                                    inputUrl = clip.trim()
                                 }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .testTag("paste_from_clipboard_card_button")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentPaste,
+                                            contentDescription = "Paste",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Text(
+                                    text = "Paste from Clipboard",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                )
                             }
                         }
 
-                        // Error Banner if error occurred
+                        // Error Banner
                         if (state is ImportPlaylistUiState.Error) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Card(
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f)
                                 ),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
+                                border = BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
+                                ),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
@@ -400,7 +408,7 @@ fun ImportPlaylistDialog(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // Bottom Actions: Cancel & Import Button
                         Row(
@@ -413,8 +421,7 @@ fun ImportPlaylistDialog(
                                     viewModel.resetImportState()
                                     onDismiss()
                                 },
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.padding(end = 8.dp)
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text(
                                     text = "Cancel",
@@ -422,7 +429,8 @@ fun ImportPlaylistDialog(
                                 )
                             }
 
-                            // Import Button
+                            Spacer(modifier = Modifier.width(8.dp))
+
                             Button(
                                 onClick = {
                                     if (inputUrl.isNotBlank()) {
@@ -430,20 +438,14 @@ fun ImportPlaylistDialog(
                                     }
                                 },
                                 enabled = inputUrl.isNotBlank() && !isLoading,
-                                shape = RoundedCornerShape(18.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = JioSaavnGreen,
-                                    contentColor = Color.Black
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
-                                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
+                                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp),
                                 modifier = Modifier.testTag("import_playlist_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.FileDownload,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = if (isLoading) "Importing..." else "Import",
                                     fontWeight = FontWeight.Bold,
@@ -459,40 +461,16 @@ fun ImportPlaylistDialog(
 }
 
 /**
- * Backward compatibility alias for any existing caller
- */
-@Composable
-fun ImportPlaylistBottomSheet(
-    viewModel: LibraryViewModel,
-    onDismiss: () -> Unit,
-    onNavigateToPlaylist: ((String) -> Unit)? = null
-) {
-    ImportPlaylistDialog(
-        viewModel = viewModel,
-        onDismiss = onDismiss,
-        onNavigateToPlaylist = onNavigateToPlaylist
-    )
-}
-
-/**
- * Square Card for JioSaavn Import in Library Overview
- * Meets requirement: "libray under jio saavn svg icon squre card text import playlist"
+ * Large Card-Style Import Playlist Banner
  */
 @Composable
 fun JioSaavnImportSquareCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val expressiveCardShape = RoundedCornerShape(
-        topStart = 28.dp,
-        bottomStart = 12.dp,
-        topEnd = 12.dp,
-        bottomEnd = 28.dp
-    )
-
     Surface(
         onClick = onClick,
-        shape = expressiveCardShape,
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(
             1.dp,
@@ -501,7 +479,7 @@ fun JioSaavnImportSquareCard(
         tonalElevation = 2.dp,
         modifier = modifier
             .fillMaxWidth()
-            .testTag("import_jiosaavn_square_card")
+            .testTag("import_playlist_square_card")
     ) {
         Row(
             modifier = Modifier
@@ -509,68 +487,74 @@ fun JioSaavnImportSquareCard(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Cookie4Sided Icon Container (M3 Expressive Shape)
             Surface(
-                shape = com.example.ui.theme.Cookie4Sided,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                ),
+                shape = RoundedCornerShape(13.dp),
+                color = Color(0xFF00D285).copy(alpha = 0.16f),
+                border = BorderStroke(1.dp, Color(0xFF00D285).copy(alpha = 0.30f)),
                 modifier = Modifier.size(46.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    JioSaavnBubbleIcon(
-                        size = 30.dp,
-                        contentDescription = "JioSaavn Icon"
+                Box(contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_jiosaavn),
+                        contentDescription = "JioSaavn Import",
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
-            // 2 Distinct Lines: Title (Line 1) and Subtitle (Line 2)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Import Playlist",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.5.sp
                     ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-
                 Spacer(modifier = Modifier.height(2.dp))
-
                 Text(
-                    text = "Paste JioSaavn playlist link",
+                    text = "Tap to paste link from clipboard",
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                        fontSize = 12.sp
+                    )
                 )
             }
 
-            // Trailing Chevron Arrow
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                contentDescription = "Import",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                modifier = Modifier.size(13.dp)
-            )
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentPaste,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "Paste",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 11.5.sp
+                        )
+                    )
+                }
+            }
         }
     }
 }
 
 /**
- * 1:1 Aspect Ratio Square Card for Grid views (e.g. inside Playlists Tab)
+ * Large Card-Style Grid Mosaic Item for Importing Playlists
  */
 @Composable
 fun JioSaavnImportGridSquareCard(
@@ -579,7 +563,7 @@ fun JioSaavnImportGridSquareCard(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 12.dp, topEnd = 12.dp, bottomEnd = 24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(
             1.dp,
@@ -588,82 +572,54 @@ fun JioSaavnImportGridSquareCard(
         tonalElevation = 2.dp,
         modifier = modifier
             .fillMaxWidth()
-            .testTag("import_jiosaavn_grid_card")
+            .height(200.dp)
+            .testTag("import_playlist_grid_square_card")
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
-                        RoundedCornerShape(14.dp)
-                    ),
-                contentAlignment = Alignment.Center
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF00D285).copy(alpha = 0.16f),
+                border = BorderStroke(1.dp, Color(0xFF00D285).copy(alpha = 0.30f)),
+                modifier = Modifier.size(52.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Square icon badge
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            JioSaavnBubbleIcon(
-                                size = 30.dp,
-                                contentDescription = "JioSaavn"
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "Import",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 11.sp
-                        )
+                Box(contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_jiosaavn),
+                        contentDescription = "JioSaavn Import",
+                        modifier = Modifier.size(30.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = "Import Playlist",
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
                 ),
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "JioSaavn link",
+                text = "Paste link from clipboard",
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 12.sp
                 ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
 }
+

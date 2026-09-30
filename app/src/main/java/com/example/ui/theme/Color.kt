@@ -15,10 +15,10 @@ val AmoledDarkSurface = Color(0xFF08090C)
 val AmoledDarkSurfaceVariant = Color(0xFF12141A)
 val AmoledDarkSurfaceCard = Color(0xFF0E1015)
 
-// Default Emerald Accent (Dark)
-val PixelPrimary = Color(0xFF6EE7B7) // Electric Mint
-val PixelPrimaryDark = Color(0xFF059669)
-val PixelOnPrimary = Color(0xFF022C22)
+// Default Electric Violet / Deep Indigo Accent (Dark) - NO GREEN
+val PixelPrimary = Color(0xFFA78BFA) // Electric Violet
+val PixelPrimaryDark = Color(0xFF7C3AED)
+val PixelOnPrimary = Color(0xFF1E0E45)
 
 val PixelSecondary = Color(0xFF93C5FD) // Pixel Sky
 val PixelTertiary = Color(0xFFF472B6) // Rose Coral
@@ -36,7 +36,7 @@ val PixelLightSurfaceVariant = Color(0xFFEEF2F6)
 val PixelLightSurfaceCard = Color(0xFFF1F5F9)
 val PixelLightSurfaceElevated = Color(0xFFE2E8F0)
 
-val PixelLightPrimary = Color(0xFF059669) // Deep Emerald
+val PixelLightPrimary = Color(0xFF7C3AED) // Deep Violet
 val PixelLightOnPrimary = Color(0xFFFFFFFF)
 val PixelLightSecondary = Color(0xFF0284C7)
 val PixelLightTertiary = Color(0xFFDB2777)

@@ -4,78 +4,114 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-// Figtree Geometric / Clean modern Google Font
-val FigtreeFontFamily = FontFamily(
-    Font(R.font.figtree, FontWeight.Normal),
-    Font(R.font.figtree, FontWeight.Medium),
-    Font(R.font.figtree, FontWeight.SemiBold),
-    Font(R.font.figtree, FontWeight.Bold),
-    Font(R.font.figtree, FontWeight.ExtraBold)
+// Plus Jakarta Sans Font Family (Bold, Italic, Normal, Medium sabhi weights ke sath)
+val PlusJakartaSans = FontFamily(
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.Normal, style = FontStyle.Italic),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.Medium, style = FontStyle.Italic),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.SemiBold, style = FontStyle.Italic),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.Bold, style = FontStyle.Italic),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.ExtraBold, style = FontStyle.Normal),
+    Font(resId = R.font.plus_jakarta_sans, weight = FontWeight.ExtraBold, style = FontStyle.Italic)
 )
 
-// SF Pro Display / Modern Neo-Grotesque Google Font (Inter)
+// Primary AppFontFamily (Plus Jakarta Sans with Bold, Italic, Normal & Medium support)
+val AppFontFamily = PlusJakartaSans
+
+// Poppins Google Font Family
+val PoppinsFontFamily = FontFamily(
+    Font(resId = R.font.poppins, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.poppins, weight = FontWeight.Normal, style = FontStyle.Italic),
+    Font(resId = R.font.poppins, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.poppins, weight = FontWeight.Medium, style = FontStyle.Italic),
+    Font(resId = R.font.poppins, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.poppins, weight = FontWeight.SemiBold, style = FontStyle.Italic),
+    Font(resId = R.font.poppins, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(resId = R.font.poppins, weight = FontWeight.Bold, style = FontStyle.Italic),
+    Font(resId = R.font.poppins, weight = FontWeight.ExtraBold, style = FontStyle.Normal)
+)
+
+// Figtree Geometric / Clean modern Google Font
+val FigtreeFontFamily = FontFamily(
+    Font(resId = R.font.figtree, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.figtree, weight = FontWeight.Normal, style = FontStyle.Italic),
+    Font(resId = R.font.figtree, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.figtree, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.figtree, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(resId = R.font.figtree, weight = FontWeight.Bold, style = FontStyle.Italic),
+    Font(resId = R.font.figtree, weight = FontWeight.ExtraBold, style = FontStyle.Normal)
+)
+
+// Inter / SF Pro Display Modern Neo-Grotesque Google Font
 val SFProFontFamily = FontFamily(
-    Font(R.font.inter, FontWeight.Normal),
-    Font(R.font.inter, FontWeight.Medium),
-    Font(R.font.inter, FontWeight.SemiBold),
-    Font(R.font.inter, FontWeight.Bold),
-    Font(R.font.inter, FontWeight.ExtraBold)
+    Font(resId = R.font.inter, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.inter, weight = FontWeight.Normal, style = FontStyle.Italic),
+    Font(resId = R.font.inter, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.inter, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.inter, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(resId = R.font.inter, weight = FontWeight.Bold, style = FontStyle.Italic),
+    Font(resId = R.font.inter, weight = FontWeight.ExtraBold, style = FontStyle.Normal)
 )
 
 // Modern geometric Google font for bold headings, display titles, and hero sections
 val OutfitFontFamily = FontFamily(
-    Font(R.font.outfit, FontWeight.Normal),
-    Font(R.font.outfit, FontWeight.Medium),
-    Font(R.font.outfit, FontWeight.SemiBold),
-    Font(R.font.outfit, FontWeight.Bold),
-    Font(R.font.outfit, FontWeight.ExtraBold)
-)
-
-// Clean Google font for body copy, labels, and metadata
-val PlusJakartaSans = FontFamily(
-    Font(R.font.plus_jakarta_sans, FontWeight.Normal),
-    Font(R.font.plus_jakarta_sans, FontWeight.Medium),
-    Font(R.font.plus_jakarta_sans, FontWeight.SemiBold),
-    Font(R.font.plus_jakarta_sans, FontWeight.Bold),
-    Font(R.font.plus_jakarta_sans, FontWeight.ExtraBold)
+    Font(resId = R.font.outfit, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.outfit, weight = FontWeight.Normal, style = FontStyle.Italic),
+    Font(resId = R.font.outfit, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.outfit, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.outfit, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(resId = R.font.outfit, weight = FontWeight.Bold, style = FontStyle.Italic),
+    Font(resId = R.font.outfit, weight = FontWeight.ExtraBold, style = FontStyle.Normal)
 )
 
 // DM Sans Geometric font
 val DMSansFontFamily = FontFamily(
-    Font(R.font.dm_sans, FontWeight.Normal),
-    Font(R.font.dm_sans, FontWeight.Medium),
-    Font(R.font.dm_sans, FontWeight.SemiBold),
-    Font(R.font.dm_sans, FontWeight.Bold)
+    Font(resId = R.font.dm_sans, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.dm_sans, weight = FontWeight.Normal, style = FontStyle.Italic),
+    Font(resId = R.font.dm_sans, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.dm_sans, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.dm_sans, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(resId = R.font.dm_sans, weight = FontWeight.Bold, style = FontStyle.Italic)
 )
 
 // Manrope Studio font
 val ManropeFontFamily = FontFamily(
-    Font(R.font.manrope, FontWeight.Normal),
-    Font(R.font.manrope, FontWeight.Medium),
-    Font(R.font.manrope, FontWeight.SemiBold),
-    Font(R.font.manrope, FontWeight.Bold)
+    Font(resId = R.font.manrope, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.manrope, weight = FontWeight.Normal, style = FontStyle.Italic),
+    Font(resId = R.font.manrope, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.manrope, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.manrope, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(resId = R.font.manrope, weight = FontWeight.Bold, style = FontStyle.Italic)
 )
 
 enum class FontOption(val id: String, val displayName: String, val subtitle: String) {
+    PLUS_JAKARTA_SANS("plus_jakarta_sans", "Plus Jakarta Sans", "Bold titles & italic artist modern typography"),
+    POPPINS("poppins", "Poppins", "Rounded geometric studio aesthetics"),
+    SF_PRO_DISPLAY("sf_pro_display", "Inter / SF Pro", "Clean neo-grotesque precision"),
     FIGTREE("figtree", "Figtree", "Clean, modern geometric sans-serif"),
-    SF_PRO_DISPLAY("sf_pro_display", "SF Pro Display", "Clean iOS & Mac Studio aesthetics"),
     OUTFIT("outfit", "Outfit & Jakarta", "Pixel dynamic expressive"),
     DM_SANS("dm_sans", "DM Sans", "Geometric modern design"),
     MANROPE("manrope", "Manrope Studio", "Tech & modern precision");
 
     companion object {
         fun fromId(id: String): FontOption {
-            return entries.firstOrNull { it.id == id } ?: FIGTREE
+            return entries.firstOrNull { it.id == id } ?: PLUS_JAKARTA_SANS
         }
     }
 }
 
 fun getAppTypography(fontOption: FontOption): Typography {
     val (displayFont, bodyFont) = when (fontOption) {
+        FontOption.PLUS_JAKARTA_SANS -> Pair(PlusJakartaSans, PlusJakartaSans)
+        FontOption.POPPINS -> Pair(PoppinsFontFamily, PoppinsFontFamily)
         FontOption.FIGTREE -> Pair(FigtreeFontFamily, FigtreeFontFamily)
         FontOption.SF_PRO_DISPLAY -> Pair(SFProFontFamily, SFProFontFamily)
         FontOption.OUTFIT -> Pair(OutfitFontFamily, PlusJakartaSans)
@@ -192,4 +228,4 @@ fun getAppTypography(fontOption: FontOption): Typography {
     )
 }
 
-val Typography = getAppTypography(FontOption.FIGTREE)
+val Typography = getAppTypography(FontOption.PLUS_JAKARTA_SANS)

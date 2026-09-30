@@ -1,5 +1,6 @@
 package com.example.player
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -9,9 +10,11 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -21,6 +24,8 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import coil.ImageLoader
 import coil.request.ImageRequest
 import com.example.data.model.PlayableTrack
@@ -48,6 +53,7 @@ class PlayerManager private constructor(private val appContext: Context) {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val repository = MusicRepository(appContext)
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    val equalizerManager: EqualizerManager = EqualizerManager.getInstance(appContext)
 
     private var mediaPlayer: MediaPlayer? = null
     private var isMediaPlayerPrepared = false
@@ -95,6 +101,12 @@ class PlayerManager private constructor(private val appContext: Context) {
     private val _volume = MutableStateFlow(1.0f)
     val volume: StateFlow<Float> = _volume.asStateFlow()
 
+    private val _isCurrentTrackLiked = MutableStateFlow(false)
+    val isCurrentTrackLiked: StateFlow<Boolean> = _isCurrentTrackLiked.asStateFlow()
+
+    private var currentArtworkBytes: ByteArray? = null
+    private var mediaControllerFuture: ListenableFuture<MediaController>? = null
+    private var wifiLock: WifiManager.WifiLock? = null
     private var progressJob: Job? = null
     private var originalQueueBeforeShuffle: List<PlayableTrack> = emptyList()
     private var isFetchingReco = false
@@ -185,21 +197,42 @@ class PlayerManager private constructor(private val appContext: Context) {
 
                 if (item != null) {
                     val durUs = if (this@PlayerManager._durationMs.value > 0) this@PlayerManager._durationMs.value * 1000L else C.TIME_UNSET
-                    val itemData = MediaItemData.Builder(item.mediaId.ifBlank { "current_track" })
+                    val baseId = item.mediaId.ifBlank { "current_track" }
+                    val prevItemData = MediaItemData.Builder("prev_$baseId")
+                        .setMediaItem(MediaItem.fromUri(Uri.EMPTY))
+                        .setIsSeekable(false)
+                        .build()
+                    val currentItemData = MediaItemData.Builder(baseId)
                         .setMediaItem(item)
                         .setMediaMetadata(item.mediaMetadata)
                         .setIsSeekable(true)
                         .setIsDynamic(false)
                         .setDurationUs(durUs)
                         .build()
-                    builder.setPlaylist(listOf(itemData))
-                    builder.setCurrentMediaItemIndex(0)
+                    val nextItemData = MediaItemData.Builder("next_$baseId")
+                        .setMediaItem(MediaItem.fromUri(Uri.EMPTY))
+                        .setIsSeekable(false)
+                        .build()
+
+                    builder.setPlaylist(listOf(prevItemData, currentItemData, nextItemData))
+                    builder.setCurrentMediaItemIndex(1)
                     builder.setPlaylistMetadata(item.mediaMetadata)
-                    builder.setContentPositionMs { this@PlayerManager.getCurrentPositionSafe() }
+
+                    val currentPos = this@PlayerManager.getCurrentPositionSafe()
+                    val isAdvancing = this@PlayerManager._isPlaying.value &&
+                        !this@PlayerManager._isBuffering.value &&
+                        this@PlayerManager.currentPlaybackState == Player.STATE_READY
+                    builder.setContentPositionMs(
+                        if (isAdvancing) {
+                            SimpleBasePlayer.PositionSupplier.getExtrapolating(currentPos, 1.0f)
+                        } else {
+                            SimpleBasePlayer.PositionSupplier.getConstant(currentPos)
+                        }
+                    )
                 } else {
                     builder.setPlaylist(emptyList())
                     builder.setCurrentMediaItemIndex(C.INDEX_UNSET)
-                    builder.setContentPositionMs(0L)
+                    builder.setContentPositionMs(SimpleBasePlayer.PositionSupplier.getConstant(0L))
                 }
 
                 return builder.build()
@@ -228,16 +261,20 @@ class PlayerManager private constructor(private val appContext: Context) {
                 positionMs: Long,
                 seekCommand: Int
             ): ListenableFuture<*> {
-                when (seekCommand) {
-                    Player.COMMAND_SEEK_TO_NEXT,
-                    Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> skipToNext()
-                    Player.COMMAND_SEEK_TO_PREVIOUS,
-                    Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> skipToPrevious()
-                    Player.COMMAND_SEEK_BACK -> {
+                when {
+                    seekCommand == Player.COMMAND_SEEK_TO_NEXT ||
+                    seekCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
+                    mediaItemIndex > 1 -> skipToNext()
+
+                    seekCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||
+                    seekCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM ||
+                    mediaItemIndex == 0 -> skipToPrevious()
+
+                    seekCommand == Player.COMMAND_SEEK_BACK -> {
                         val target = (_currentPositionMs.value - 10_000L).coerceAtLeast(0L)
                         seekTo(target)
                     }
-                    Player.COMMAND_SEEK_FORWARD -> {
+                    seekCommand == Player.COMMAND_SEEK_FORWARD -> {
                         val maxDur = _durationMs.value.coerceAtLeast(0L)
                         val target = (_currentPositionMs.value + 10_000L).let {
                             if (maxDur > 0) it.coerceAtMost(maxDur) else it
@@ -353,6 +390,69 @@ class PlayerManager private constructor(private val appContext: Context) {
         } catch (e: Exception) {
             Log.w(tag, "Service start deferred: ${e.message}")
         }
+        try {
+            if (mediaControllerFuture == null) {
+                val sessionToken = SessionToken(
+                    appContext,
+                    ComponentName(appContext, MusicPlaybackService::class.java)
+                )
+                mediaControllerFuture = MediaController.Builder(appContext, sessionToken).buildAsync()
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "MediaController connection deferred: ${e.message}")
+        }
+    }
+
+    private fun acquireWifiLock() {
+        try {
+            if (wifiLock == null) {
+                val wm = appContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                if (wm != null) {
+                    val lockMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                    } else {
+                        @Suppress("DEPRECATION")
+                        WifiManager.WIFI_MODE_FULL_HIGH_PERF
+                    }
+                    wifiLock = wm.createWifiLock(lockMode, "SMusic:PlaybackWifiLock").apply {
+                        setReferenceCounted(false)
+                    }
+                }
+            }
+            if (wifiLock?.isHeld == false) {
+                wifiLock?.acquire()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun releaseWifiLock() {
+        try {
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private var likeStateJob: Job? = null
+
+    fun toggleCurrentTrackLike() {
+        val current = _currentTrack.value ?: return
+        scope.launch(Dispatchers.IO) {
+            try {
+                repository.toggleLike(current)
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun refreshCurrentTrackLikeState(trackId: String) {
+        likeStateJob?.cancel()
+        likeStateJob = scope.launch(Dispatchers.IO) {
+            try {
+                repository.isSongLiked(trackId).collect { isLiked ->
+                    _isCurrentTrackLiked.value = isLiked
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     private val imageLoader by lazy { ImageLoader(appContext) }
@@ -391,6 +491,7 @@ class PlayerManager private constructor(private val appContext: Context) {
         _isBuffering.value = false
         currentPlaybackState = Player.STATE_IDLE
         releaseMediaPlayer()
+        releaseWifiLock()
         abandonAudioFocus()
         invalidateSessionState()
     }
@@ -494,6 +595,8 @@ class PlayerManager private constructor(private val appContext: Context) {
 
         val updatedTrack = track.copy(streamUrl = resolvedUrl, artwork = localArtwork)
         _currentTrack.value = updatedTrack
+        currentArtworkBytes = null
+        refreshCurrentTrackLikeState(updatedTrack.id)
 
         ensureServiceStarted()
         updateMediaItemMetadata(updatedTrack, localArtwork, null)
@@ -504,6 +607,7 @@ class PlayerManager private constructor(private val appContext: Context) {
             artworkJob = scope.launch {
                 val bytes = loadArtworkBytes(localArtwork)
                 if (bytes != null && bytes.isNotEmpty() && _currentTrack.value?.id == updatedTrack.id) {
+                    currentArtworkBytes = bytes
                     updateMediaItemMetadata(updatedTrack, localArtwork, bytes)
                 }
             }
@@ -512,7 +616,7 @@ class PlayerManager private constructor(private val appContext: Context) {
         prepareAndPlayUrl(updatedTrack, resolvedUrl)
 
         // Proactively prefetch auto-recommendations if queue is short (<= 2 items)
-        checkAndPreloadRecommendations(track.id)
+        checkAndPreloadRecommendations(updatedTrack.id, updatedTrack)
     }
 
     private fun updateMediaItemMetadata(
@@ -520,12 +624,21 @@ class PlayerManager private constructor(private val appContext: Context) {
         artworkUriStr: String,
         artworkBytes: ByteArray?
     ) {
+        val durMs = _durationMs.value
         val mediaMetadata = MediaMetadata.Builder()
             .setTitle(track.title)
+            .setDisplayTitle(track.title)
             .setArtist(track.artist)
             .setAlbumTitle(track.album)
+            .setAlbumArtist(track.artist)
+            .setIsBrowsable(false)
+            .setIsPlayable(true)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
             .setArtworkUri(if (artworkUriStr.isNotBlank()) Uri.parse(artworkUriStr) else null)
             .apply {
+                if (durMs > 0L) {
+                    setDurationMs(durMs)
+                }
                 if (artworkBytes != null && artworkBytes.isNotEmpty()) {
                     setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
                 }
@@ -544,6 +657,7 @@ class PlayerManager private constructor(private val appContext: Context) {
     private fun prepareAndPlayUrl(track: PlayableTrack, url: String) {
         releaseMediaPlayer()
         requestAudioFocus()
+        acquireWifiLock()
 
         _isBuffering.value = true
         playWhenReadyRequested = true
@@ -554,12 +668,23 @@ class PlayerManager private constructor(private val appContext: Context) {
         mediaPlayer = mp
 
         try {
+            try {
+                mp.setWakeMode(appContext, PowerManager.PARTIAL_WAKE_LOCK)
+            } catch (_: Exception) {}
+
             mp.setAudioAttributes(
                 PlatformAudioAttributes.Builder()
                     .setContentType(PlatformAudioAttributes.CONTENT_TYPE_MUSIC)
                     .setUsage(PlatformAudioAttributes.USAGE_MEDIA)
                     .build()
             )
+
+            try {
+                val targetSessionId = equalizerManager.getOrGenerateAudioSessionId()
+                if (targetSessionId > 0) {
+                    mp.audioSessionId = targetSessionId
+                }
+            } catch (_: Exception) {}
 
             setMediaPlayerDataSource(mp, url)
 
@@ -569,6 +694,10 @@ class PlayerManager private constructor(private val appContext: Context) {
                 _isBuffering.value = false
                 _errorMessage.value = null
                 currentPlaybackState = Player.STATE_READY
+
+                try {
+                    equalizerManager.bindToAudioSession(preparedMp.audioSessionId)
+                } catch (_: Exception) {}
 
                 val dur = try { preparedMp.duration.toLong() } catch (_: Exception) { 0L }
                 if (dur > 0) {
@@ -589,7 +718,7 @@ class PlayerManager private constructor(private val appContext: Context) {
                         Log.e(tag, "Failed to start MediaPlayer: ${e.message}")
                     }
                 }
-                invalidateSessionState()
+                updateMediaItemMetadata(track, track.artwork, currentArtworkBytes)
             }
 
             mp.setOnCompletionListener { completedMp ->
@@ -673,7 +802,47 @@ class PlayerManager private constructor(private val appContext: Context) {
         }
     }
 
-    private fun checkAndPreloadRecommendations(songId: String) {
+    fun startRadio(track: PlayableTrack) {
+        playbackJob?.cancel()
+        playbackJob = scope.launch {
+            _isAutoplayEnabled.value = true
+            _queue.value = listOf(track)
+            _currentIndex.value = 0
+            startPlaybackForTrack(track)
+
+            // Immediately fetch high-quality radio mix recommendations for this seed song
+            loadMoreRecommendations(seedTrack = track)
+        }
+    }
+
+    fun loadMoreRecommendations(seedTrack: PlayableTrack? = null) {
+        val target = seedTrack ?: _currentTrack.value ?: return
+        if (isFetchingReco) return
+        isFetchingReco = true
+        scope.launch(Dispatchers.IO) {
+            try {
+                val recos = repository.getRecommendations(target.id, target)
+                if (recos.isNotEmpty()) {
+                    val currentQ = _queue.value
+                    val newTracks = recos.map { it.toPlayableTrack() }.filter { recoTrack ->
+                        currentQ.none { it.id == recoTrack.id }
+                    }
+                    if (newTracks.isNotEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            _queue.value = _queue.value + newTracks
+                            Log.d(tag, "RadioMixEngine: Added ${newTracks.size} recommended tracks. Total queue: ${_queue.value.size}")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to load radio recommendations: ${e.message}")
+            } finally {
+                isFetchingReco = false
+            }
+        }
+    }
+
+    private fun checkAndPreloadRecommendations(songId: String, currentTrack: PlayableTrack? = null) {
         if (!_isAutoplayEnabled.value || isFetchingReco || songId.isBlank()) return
 
         val remaining = _queue.value.size - (_currentIndex.value + 1)
@@ -681,7 +850,7 @@ class PlayerManager private constructor(private val appContext: Context) {
             isFetchingReco = true
             scope.launch(Dispatchers.IO) {
                 try {
-                    val recos = repository.getRecommendations(songId)
+                    val recos = repository.getRecommendations(songId, currentTrack)
                     if (recos.isNotEmpty()) {
                         val currentQ = _queue.value
                         val newTracks = recos.map { it.toPlayableTrack() }.filter { recoTrack ->
@@ -791,7 +960,7 @@ class PlayerManager private constructor(private val appContext: Context) {
         scope.launch {
             _isBuffering.value = true
             invalidateSessionState()
-            val recos = repository.getRecommendations(current.id)
+            val recos = repository.getRecommendations(current.id, current)
             if (recos.isNotEmpty()) {
                 val newTracks = recos.map { it.toPlayableTrack() }
                 val updatedQueue = _queue.value + newTracks
@@ -818,6 +987,7 @@ class PlayerManager private constructor(private val appContext: Context) {
         playWhenReadyRequested = false
         _isPlaying.value = false
         stopProgressTracker()
+        releaseWifiLock()
         val mp = mediaPlayer
         if (mp != null && isMediaPlayerPrepared) {
             try {
@@ -835,6 +1005,7 @@ class PlayerManager private constructor(private val appContext: Context) {
         val mp = mediaPlayer
         if (mp != null && isMediaPlayerPrepared) {
             requestAudioFocus()
+            acquireWifiLock()
             playWhenReadyRequested = true
             try {
                 mp.start()

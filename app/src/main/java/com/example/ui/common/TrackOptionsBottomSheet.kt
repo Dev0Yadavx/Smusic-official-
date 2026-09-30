@@ -14,11 +14,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.data.model.PlayableTrack
+import com.example.ui.theme.AppFontFamily
 import com.example.ui.theme.AppIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,14 +82,25 @@ fun TrackOptionsBottomSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = track.title,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        fontFamily = AppFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = AppFontFamily,
+                            fontWeight = FontWeight.Bold
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = track.artist,
+                        fontFamily = AppFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
                         style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFontFamily,
+                            fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         maxLines = 1,
@@ -100,6 +113,192 @@ fun TrackOptionsBottomSheet(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             )
+
+            // Segmented 3-Card Row: Like (Start Rounding), Download (Middle), Add to Playlist (Last Rounding)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 1. Like Card (Start Rounding)
+                val likeShape = RoundedCornerShape(
+                    topStart = 24.dp,
+                    bottomStart = 24.dp,
+                    topEnd = 6.dp,
+                    bottomEnd = 6.dp
+                )
+                Surface(
+                    onClick = {
+                        onToggleLike()
+                        onDismiss()
+                    },
+                    shape = likeShape,
+                    color = if (isLiked) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = if (isLiked) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                        }
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp)
+                        .testTag("sheet_card_like")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = if (isLiked) "Liked" else "Like",
+                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (isLiked) "Liked" else "Like",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // 2. Download Card (Middle)
+                val downloadShape = RoundedCornerShape(6.dp)
+                val dlActive = isDownloaded || isDownloading
+                val dlLabel = when {
+                    isDownloading -> "$downloadProgress%"
+                    isDownloaded -> "Downloaded"
+                    else -> "Download"
+                }
+                Surface(
+                    onClick = {
+                        if (isDownloading) {
+                            downloadManager.cancelDownload(track.id)
+                            android.widget.Toast.makeText(context, "Download cancelled", android.widget.Toast.LENGTH_SHORT).show()
+                        } else if (isDownloaded) {
+                            downloadManager.deleteDownloadedSong(track.id)
+                            android.widget.Toast.makeText(context, "Removed from downloads", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            downloadManager.startDownload(track, "320")
+                            android.widget.Toast.makeText(context, "Download started for ${track.title}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        onDismiss()
+                    },
+                    shape = downloadShape,
+                    color = if (dlActive) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = if (dlActive) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                        }
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp)
+                        .testTag("sheet_card_download")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = when {
+                                isDownloading -> Icons.Outlined.Downloading
+                                isDownloaded -> AppIcons.DownloadForOffline
+                                else -> AppIcons.Download
+                            },
+                            contentDescription = dlLabel,
+                            tint = if (dlActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = dlLabel,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (dlActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // 3. Add to Playlist Card (Last Rounding)
+                val playlistShape = RoundedCornerShape(
+                    topStart = 6.dp,
+                    bottomStart = 6.dp,
+                    topEnd = 24.dp,
+                    bottomEnd = 24.dp
+                )
+                Surface(
+                    onClick = {
+                        onAddToPlaylist()
+                        onDismiss()
+                    },
+                    shape = playlistShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp)
+                        .testTag("sheet_card_add_to_playlist")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.BookmarkAdd,
+                            contentDescription = "Add to Playlist",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Add to Playlist",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
 
             OptionItem(
                 icon = Icons.Default.PlayArrow,
@@ -127,59 +326,6 @@ fun TrackOptionsBottomSheet(
                     onDismiss()
                 }
             )
-
-            OptionItem(
-                icon = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                title = if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
-                iconTint = if (isLiked) MaterialTheme.colorScheme.primary else null,
-                onClick = {
-                    onToggleLike()
-                    onDismiss()
-                }
-            )
-
-            OptionItem(
-                icon = Icons.Outlined.BookmarkAdd,
-                title = "Add to Playlist",
-                onClick = {
-                    onAddToPlaylist()
-                    onDismiss()
-                }
-            )
-
-            if (isDownloading) {
-                OptionItem(
-                    icon = Icons.Outlined.Downloading,
-                    title = "Downloading ($downloadProgress%)",
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onClick = {
-                        downloadManager.cancelDownload(track.id)
-                        android.widget.Toast.makeText(context, "Download cancelled", android.widget.Toast.LENGTH_SHORT).show()
-                        onDismiss()
-                    }
-                )
-            } else if (isDownloaded) {
-                OptionItem(
-                    icon = AppIcons.DownloadForOffline,
-                    title = "Downloaded",
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onClick = {
-                        downloadManager.deleteDownloadedSong(track.id)
-                        android.widget.Toast.makeText(context, "Removed from downloads", android.widget.Toast.LENGTH_SHORT).show()
-                        onDismiss()
-                    }
-                )
-            } else {
-                OptionItem(
-                    icon = AppIcons.Download,
-                    title = "Download",
-                    onClick = {
-                        downloadManager.startDownload(track, "320")
-                        android.widget.Toast.makeText(context, "Download started for ${track.title}", android.widget.Toast.LENGTH_SHORT).show()
-                        onDismiss()
-                    }
-                )
-            }
 
             if (track.albumId.isNotBlank() && onViewAlbum != null) {
                 OptionItem(

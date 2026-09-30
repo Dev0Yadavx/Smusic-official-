@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +54,7 @@ import com.example.ui.player.NowPlayingModal
 import com.example.ui.search.SearchScreen
 import com.example.ui.search.SearchViewModel
 import com.example.ui.settings.SettingsScreen
+import com.example.ui.splash.ExpressiveSplashScreen
 import com.example.ui.theme.AccentPalette
 import com.example.ui.theme.SMusicTheme
 import com.example.ui.theme.ThemeManager
@@ -104,14 +106,22 @@ class MainActivity : ComponentActivity() {
                 accentPalette = accentPalette,
                 fontOption = fontOption
             ) {
+                var showSplash by rememberSaveable { mutableStateOf(true) }
+                var isMainContentReady by rememberSaveable { mutableStateOf(false) }
+
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(150)
+                    isMainContentReady = true
+                }
+
                 // Runtime Notification Permission on Android 13+ (Pixel lockscreen / media notification support)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     val notifPermissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestPermission()
                     ) { /* Handled */ }
 
-                    LaunchedEffect(Unit) {
-                        if (ContextCompat.checkSelfPermission(
+                    LaunchedEffect(showSplash) {
+                        if (!showSplash && ContextCompat.checkSelfPermission(
                                 this@MainActivity,
                                 Manifest.permission.POST_NOTIFICATIONS
                             ) != PackageManager.PERMISSION_GRANTED
@@ -141,166 +151,168 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    // Full Screen Content Layer: Extends fully to screen edges underneath floating controls
-                    Box(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        when (val sub = currentSubScreen) {
-                            is SubScreen.Settings -> {
-                                SettingsScreen(
-                                    repository = repository,
-                                    playerManager = playerManager,
-                                    themeManager = themeManager,
-                                    onBack = { currentSubScreen = SubScreen.None }
-                                )
-                            }
-                            is SubScreen.AlbumDetail -> {
-                                AlbumDetailScreen(
-                                    albumId = sub.id,
-                                    initialTitle = sub.title,
-                                    initialArtist = sub.artist,
-                                    initialArtwork = sub.artwork,
-                                    repository = repository,
-                                    playerManager = playerManager,
-                                    onBack = { currentSubScreen = SubScreen.None }
-                                )
-                            }
-                            is SubScreen.PlaylistDetail -> {
-                                PlaylistDetailScreen(
-                                    playlistId = sub.id,
-                                    repository = repository,
-                                    playerManager = playerManager,
-                                    onBack = { currentSubScreen = SubScreen.None }
-                                )
-                            }
-                            is SubScreen.ArtistDetail -> {
-                                ArtistDetailScreen(
-                                    artistId = sub.id,
-                                    repository = repository,
-                                    playerManager = playerManager,
-                                    onNavigateToAlbum = { albumId -> 
-                                        currentSubScreen = SubScreen.AlbumDetail(id = albumId) 
-                                    },
-                                    onBack = { currentSubScreen = SubScreen.None }
-                                )
-                            }
-                            SubScreen.None -> {
-                                when (currentRootScreen) {
-                                    RootScreen.HOME -> {
-                                        HomeScreen(
-                                            viewModel = homeViewModel,
-                                            playerManager = playerManager,
-                                            onNavigateToSearch = { currentRootScreen = RootScreen.SEARCH },
-                                            onNavigateToSettings = { currentSubScreen = SubScreen.Settings },
-                                            onNavigateToAlbum = { album ->
-                                                currentSubScreen = SubScreen.AlbumDetail(
-                                                    id = album.id,
-                                                    title = album.title,
-                                                    artist = album.artist,
-                                                    artwork = album.artwork
-                                                )
-                                            },
-                                            onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) },
-                                            onNavigateToArtist = { currentSubScreen = SubScreen.ArtistDetail(it) }
-                                        )
-                                    }
-                                    RootScreen.SEARCH -> {
-                                        SearchScreen(
-                                            viewModel = searchViewModel,
-                                            playerManager = playerManager,
-                                            onNavigateToAlbum = { album ->
-                                                currentSubScreen = SubScreen.AlbumDetail(
-                                                    id = album.id,
-                                                    title = album.title,
-                                                    artist = album.artist,
-                                                    artwork = album.artwork
-                                                )
-                                            },
-                                            onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) },
-                                            onNavigateToArtist = { currentSubScreen = SubScreen.ArtistDetail(it) }
-                                        )
-                                    }
-                                    RootScreen.LIBRARY -> {
-                                        LibraryScreen(
-                                            viewModel = libraryViewModel,
-                                            playerManager = playerManager,
-                                            onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) }
-                                        )
+                    if (isMainContentReady || !showSplash) {
+                        // Full Screen Content Layer: Extends fully to screen edges underneath floating controls
+                        Box(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            when (val sub = currentSubScreen) {
+                                is SubScreen.Settings -> {
+                                    SettingsScreen(
+                                        repository = repository,
+                                        playerManager = playerManager,
+                                        themeManager = themeManager,
+                                        onBack = { currentSubScreen = SubScreen.None }
+                                    )
+                                }
+                                is SubScreen.AlbumDetail -> {
+                                    AlbumDetailScreen(
+                                        albumId = sub.id,
+                                        initialTitle = sub.title,
+                                        initialArtist = sub.artist,
+                                        initialArtwork = sub.artwork,
+                                        repository = repository,
+                                        playerManager = playerManager,
+                                        onBack = { currentSubScreen = SubScreen.None }
+                                    )
+                                }
+                                is SubScreen.PlaylistDetail -> {
+                                    PlaylistDetailScreen(
+                                        playlistId = sub.id,
+                                        repository = repository,
+                                        playerManager = playerManager,
+                                        onBack = { currentSubScreen = SubScreen.None }
+                                    )
+                                }
+                                is SubScreen.ArtistDetail -> {
+                                    ArtistDetailScreen(
+                                        artistId = sub.id,
+                                        repository = repository,
+                                        playerManager = playerManager,
+                                        onNavigateToAlbum = { albumId -> 
+                                            currentSubScreen = SubScreen.AlbumDetail(id = albumId) 
+                                        },
+                                        onBack = { currentSubScreen = SubScreen.None }
+                                    )
+                                }
+                                SubScreen.None -> {
+                                    when (currentRootScreen) {
+                                        RootScreen.HOME -> {
+                                            HomeScreen(
+                                                viewModel = homeViewModel,
+                                                playerManager = playerManager,
+                                                onNavigateToSearch = { currentRootScreen = RootScreen.SEARCH },
+                                                onNavigateToSettings = { currentSubScreen = SubScreen.Settings },
+                                                onNavigateToAlbum = { album ->
+                                                    currentSubScreen = SubScreen.AlbumDetail(
+                                                        id = album.id,
+                                                        title = album.title,
+                                                        artist = album.artist,
+                                                        artwork = album.artwork
+                                                    )
+                                                },
+                                                onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) },
+                                                onNavigateToArtist = { currentSubScreen = SubScreen.ArtistDetail(it) }
+                                            )
+                                        }
+                                        RootScreen.SEARCH -> {
+                                            SearchScreen(
+                                                viewModel = searchViewModel,
+                                                playerManager = playerManager,
+                                                onNavigateToAlbum = { album ->
+                                                    currentSubScreen = SubScreen.AlbumDetail(
+                                                        id = album.id,
+                                                        title = album.title,
+                                                        artist = album.artist,
+                                                        artwork = album.artwork
+                                                    )
+                                                },
+                                                onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) },
+                                                onNavigateToArtist = { currentSubScreen = SubScreen.ArtistDetail(it) }
+                                            )
+                                        }
+                                        RootScreen.LIBRARY -> {
+                                            LibraryScreen(
+                                                viewModel = libraryViewModel,
+                                                playerManager = playerManager,
+                                                onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) }
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Full Mask Gradient Scrim (Smooth fade overlay so scrolling content effortlessly blends under floating controls)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(190.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.40f),
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.98f)
-                                    )
-                                )
-                            )
-                    )
-
-                    // Floating Row containing Split Liquid Glass Navigation Bar and Mini Player
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Full Rounded Floating Mini Player with Liquid Glass styling
-                        AnimatedVisibility(
-                            visible = currentTrack != null && !isNowPlayingOpen,
-                            enter = slideInVertically(initialOffsetY = { it / 2 }) + expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
-                            exit = slideOutVertically(targetOffsetY = { it / 2 }) + shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(24.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    width = 1.dp,
-                                    brush = Brush.verticalGradient(
+                        // Full Mask Gradient Scrim (Smooth fade overlay so scrolling content effortlessly blends under floating controls)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(190.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
                                         colors = listOf(
-                                            Color.White.copy(alpha = 0.35f),
-                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)
+                                            Color.Transparent,
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0.40f),
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0.98f)
                                         )
                                     )
-                                ),
-                                tonalElevation = 6.dp,
-                                shadowElevation = 10.dp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("floating_mini_player_container")
-                            ) {
-                                MiniPlayer(
-                                    playerManager = playerManager,
-                                    repository = repository,
-                                    onClick = { isNowPlayingOpen = true }
                                 )
-                            }
-                        }
-
-                        // Split Liquid Glass Navigation Bar (Home + Library Capsule + Separate Search Button)
-                        LiquidGlassSplitBottomBar(
-                            currentRootScreen = currentRootScreen,
-                            isSubScreenOpen = currentSubScreen !is SubScreen.None,
-                            onSelectTab = { screen ->
-                                currentRootScreen = screen
-                                currentSubScreen = SubScreen.None
-                            }
                         )
+
+                        // Floating Row containing Split Liquid Glass Navigation Bar and Mini Player
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Full Rounded Floating Mini Player with Liquid Glass styling
+                            AnimatedVisibility(
+                                visible = currentTrack != null && !isNowPlayingOpen,
+                                enter = slideInVertically(initialOffsetY = { it / 2 }) + expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
+                                exit = slideOutVertically(targetOffsetY = { it / 2 }) + shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        width = 1.dp,
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.35f),
+                                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)
+                                            )
+                                        )
+                                    ),
+                                    tonalElevation = 6.dp,
+                                    shadowElevation = 10.dp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("floating_mini_player_container")
+                                ) {
+                                    MiniPlayer(
+                                        playerManager = playerManager,
+                                        repository = repository,
+                                        onClick = { isNowPlayingOpen = true }
+                                    )
+                                }
+                            }
+
+                            // Split Liquid Glass Navigation Bar (Home + Library Capsule + Separate Search Button)
+                            LiquidGlassSplitBottomBar(
+                                currentRootScreen = currentRootScreen,
+                                isSubScreenOpen = currentSubScreen !is SubScreen.None,
+                                onSelectTab = { screen ->
+                                    currentRootScreen = screen
+                                    currentSubScreen = SubScreen.None
+                                }
+                            )
+                        }
                     }
 
                     // Full Screen Now Playing Modal (Slide in from bottom, covers root)
@@ -322,6 +334,25 @@ class MainActivity : ComponentActivity() {
                                 isNowPlayingOpen = false
                                 currentSubScreen = SubScreen.ArtistDetail(artistId)
                             }
+                        )
+                    }
+
+                    // Material 3 Expressive Full-Screen Splash Overlay
+                    AnimatedVisibility(
+                        visible = showSplash,
+                        enter = fadeIn(animationSpec = tween(250)),
+                        exit = fadeOut(animationSpec = tween(420, easing = FastOutSlowInEasing)) +
+                            scaleOut(
+                                targetScale = 1.08f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            ),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        ExpressiveSplashScreen(
+                            onSplashFinished = { showSplash = false }
                         )
                     }
                 }

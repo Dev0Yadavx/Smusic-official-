@@ -431,16 +431,11 @@ fun MiniPlayer(
 
     // Horizontal swipe gesture for skipping tracks
     var dragOffsetX by remember { mutableStateOf(0f) }
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    var rootOffset by remember { mutableStateOf(Offset.Zero) }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .onGloballyPositioned { coordinates ->
-                rootOffset = coordinates.positionInRoot()
-            }
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(32.dp))
             .pointerInput(track.id) {
                 detectHorizontalDragGestures(
                     onDragStart = { dragOffsetX = 0f },
@@ -462,60 +457,6 @@ fun MiniPlayer(
             .clickable(onClick = onClick)
             .testTag("mini_player")
     ) {
-        // 1. Live Background Reflection in Full Blur ("background ka reflicton full blur me")
-        if (backgroundGraphicsLayer != null) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .blur(32.dp)
-                    .drawWithContent {
-                        translate(left = -rootOffset.x, top = -rootOffset.y) {
-                            drawLayer(backgroundGraphicsLayer)
-                        }
-                    }
-            )
-        } else {
-            AsyncImage(
-                model = track.artwork,
-                contentDescription = null,
-                modifier = Modifier
-                    .matchParentSize()
-                    .scale(2.0f)
-                    .blur(36.dp),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        // 2. Clean Dark / Light Frosted Glass Tint (No moving reflection animation)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    if (isDark) {
-                        Color(0xFF10141D).copy(alpha = 0.56f)
-                    } else {
-                        Color(0xFFF8FAFF).copy(alpha = 0.62f)
-                    }
-                )
-                .background(
-                    Brush.verticalGradient(
-                        colors = if (isDark) {
-                            listOf(
-                                Color.White.copy(alpha = 0.16f),
-                                Color.White.copy(alpha = 0.03f),
-                                Color.Transparent
-                            )
-                        } else {
-                            listOf(
-                                Color.White.copy(alpha = 0.78f),
-                                Color.White.copy(alpha = 0.28f),
-                                Color.Transparent
-                            )
-                        }
-                    )
-                )
-        )
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()

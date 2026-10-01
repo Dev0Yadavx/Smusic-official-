@@ -15,6 +15,7 @@ import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -58,6 +59,12 @@ import com.example.ui.details.AlbumDetailScreen
 import com.example.ui.details.ArtistDetailScreen
 import com.example.ui.details.PlaylistDetailScreen
 import com.example.ui.home.HomeScreen
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.rememberHazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
 import com.example.ui.home.HomeViewModel
 import com.example.ui.library.LibraryScreen
 import com.example.ui.library.LibraryViewModel
@@ -109,6 +116,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by themeManager.themeMode.collectAsState()
             val useDynamicColor by themeManager.useDynamicColor.collectAsState()
             val isAmoledBlack by themeManager.isAmoledBlack.collectAsState()
+            val isLiquidGlassEnabled by themeManager.isLiquidGlassEnabled.collectAsState()
             val accentPalette by themeManager.accentPalette.collectAsState()
             val fontOption by themeManager.fontOption.collectAsState()
             val hasAgreedPermissions by themeManager.hasAgreedPermissions.collectAsState()
@@ -150,18 +158,13 @@ class MainActivity : ComponentActivity() {
                         .background(MaterialTheme.colorScheme.background)
                 ) {
                     if (isMainContentReady || !showSplash) {
-                        val backgroundGraphicsLayer = rememberGraphicsLayer()
+                        val hazeState = rememberHazeState()
 
-                        // Full Screen Content Layer: Recorded into backgroundGraphicsLayer for real-time full-blur reflection
+                        // Existing UI wrapped with Modifier.hazeSource(hazeState)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .drawWithContent {
-                                    backgroundGraphicsLayer.record {
-                                        this@drawWithContent.drawContent()
-                                    }
-                                    drawLayer(backgroundGraphicsLayer)
-                                }
+                                .hazeSource(hazeState)
                         ) {
                             when (val sub = currentSubScreen) {
                                 is SubScreen.Settings -> {
@@ -250,8 +253,6 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
                         // Floating Row containing Split Liquid Glass Navigation Bar and Mini Player
                         Column(
                             modifier = Modifier
@@ -262,53 +263,63 @@ class MainActivity : ComponentActivity() {
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Full Rounded Floating Mini Player with Live Background Reflection in Full Blur
+                            // Existing Mini Player with HazeBlur (28.dp) when Liquid Glass is ON, or solid M3 surface when OFF
                             AnimatedVisibility(
                                 visible = currentTrack != null && !isNowPlayingOpen,
                                 enter = slideInVertically(initialOffsetY = { it / 2 }) + expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
                                 exit = slideOutVertically(targetOffsetY = { it / 2 }) + shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color.Transparent,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        width = 1.3.dp,
-                                        brush = Brush.linearGradient(
-                                            colors = if (isDarkTheme) {
-                                                listOf(
-                                                    Color.White.copy(alpha = 0.58f),
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.42f),
-                                                    Color.White.copy(alpha = 0.20f)
-                                                )
-                                            } else {
-                                                listOf(
-                                                    Color.White,
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
-                                                    Color.White.copy(alpha = 0.85f)
-                                                )
+                                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                                val miniPlayerModifier = if (isLiquidGlassEnabled) {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .hazeBlur(
+                                            input = HazeInput.Sources(hazeState),
+                                            style = HazeBlurStyle {
+                                                blurRadius(28.dp)
                                             }
                                         )
-                                    ),
-                                    tonalElevation = 10.dp,
-                                    shadowElevation = 16.dp,
-                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(32.dp))
+                                        .background(
+                                            if (isDark) Color.White.copy(alpha = 0.16f)
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isDark) Color.White.copy(alpha = 0.20f)
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                                            RoundedCornerShape(32.dp)
+                                        )
+                                } else {
+                                    Modifier
                                         .fillMaxWidth()
+                                        .clip(RoundedCornerShape(32.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                                            RoundedCornerShape(32.dp)
+                                        )
+                                }
+
+                                Box(
+                                    modifier = miniPlayerModifier
                                         .testTag("floating_mini_player_container")
                                 ) {
                                     MiniPlayer(
                                         playerManager = playerManager,
                                         repository = repository,
-                                        backgroundGraphicsLayer = backgroundGraphicsLayer,
                                         onClick = { isNowPlayingOpen = true }
                                     )
                                 }
                             }
 
-                            // Split Liquid Glass Navigation Bar (Home + Library Capsule + Separate Search Button)
+                            // Existing Bottom Navigation with HazeBlur (30.dp) when Liquid Glass is ON, or solid M3 surface when OFF
                             LiquidGlassSplitBottomBar(
                                 currentRootScreen = currentRootScreen,
                                 isSubScreenOpen = currentSubScreen !is SubScreen.None,
-                                backgroundGraphicsLayer = backgroundGraphicsLayer,
+                                hazeState = hazeState,
+                                isLiquidGlassEnabled = isLiquidGlassEnabled,
                                 onSelectTab = { screen ->
                                     currentRootScreen = screen
                                     currentSubScreen = SubScreen.None
@@ -381,29 +392,12 @@ class MainActivity : ComponentActivity() {
 fun LiquidGlassSplitBottomBar(
     currentRootScreen: RootScreen,
     isSubScreenOpen: Boolean,
-    backgroundGraphicsLayer: GraphicsLayer? = null,
+    hazeState: HazeState,
     onSelectTab: (RootScreen) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLiquidGlassEnabled: Boolean = true
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    var capsuleRootOffset by remember { mutableStateOf(Offset.Zero) }
-    var searchRootOffset by remember { mutableStateOf(Offset.Zero) }
-
-    val chamkBorderBrush = Brush.linearGradient(
-        colors = if (isDark) {
-            listOf(
-                Color.White.copy(alpha = 0.62f),
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                Color.White.copy(alpha = 0.22f)
-            )
-        } else {
-            listOf(
-                Color.White,
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.40f),
-                Color.White.copy(alpha = 0.88f)
-            )
-        }
-    )
 
     Row(
         modifier = modifier
@@ -412,171 +406,85 @@ fun LiquidGlassSplitBottomBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Unified Capsule for Home & Library with Live Background Reflection in Full Blur
-        Surface(
-            shape = CircleShape,
-            color = Color.Transparent,
-            border = androidx.compose.foundation.BorderStroke(
-                width = 1.3.dp,
-                brush = chamkBorderBrush
-            ),
-            tonalElevation = 12.dp,
-            shadowElevation = 18.dp,
-            modifier = Modifier
-                .onGloballyPositioned { coordinates ->
-                    capsuleRootOffset = coordinates.positionInRoot()
-                }
-                .testTag("nav_capsule_home_library")
-        ) {
-            Box(
-                modifier = Modifier.clip(CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                // Live Background Reflection in Full Blur ("background ka reflicton full blur me")
-                if (backgroundGraphicsLayer != null) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .blur(32.dp)
-                            .drawWithContent {
-                                translate(left = -capsuleRootOffset.x, top = -capsuleRootOffset.y) {
-                                    drawLayer(backgroundGraphicsLayer)
-                                }
-                            }
-                    )
-                }
+        val navBoxModifier = if (isLiquidGlassEnabled) {
+            Modifier
+                .hazeBlur(
+                    input = HazeInput.Sources(hazeState),
+                    style = HazeBlurStyle {
+                        blurRadius(30.dp)
+                    }
+                )
+                .clip(RoundedCornerShape(36.dp))
+                .background(
+                    if (isDark) Color.White.copy(alpha = 0.13f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+                )
+                .border(
+                    1.dp,
+                    if (isDark) Color.White.copy(alpha = 0.18f)
+                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                    RoundedCornerShape(36.dp)
+                )
+        } else {
+            Modifier
+                .clip(RoundedCornerShape(36.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                    RoundedCornerShape(36.dp)
+                )
+        }
 
-                // Clean Frosted Glass Tint (No moving reflection animation)
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            if (isDark) {
-                                Color(0xFF10141D).copy(alpha = 0.58f)
-                            } else {
-                                Color(0xFFF8FAFF).copy(alpha = 0.64f)
-                            }
-                        )
-                        .background(
-                            Brush.verticalGradient(
-                                colors = if (isDark) {
-                                    listOf(
-                                        Color.White.copy(alpha = 0.16f),
-                                        Color.White.copy(alpha = 0.03f),
-                                        Color.Transparent
-                                    )
-                                } else {
-                                    listOf(
-                                        Color.White.copy(alpha = 0.78f),
-                                        Color.White.copy(alpha = 0.28f),
-                                        Color.Transparent
-                                    )
-                                }
-                            )
-                        )
+        // 1. Existing Bottom Navigation Capsule (Home & Library)
+        Box(
+            modifier = navBoxModifier
+                .testTag("nav_capsule_home_library"),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LiquidGlassNavPill(
+                    selected = currentRootScreen == RootScreen.HOME && !isSubScreenOpen,
+                    selectedIcon = Icons.Rounded.Home,
+                    unselectedIcon = Icons.Outlined.Home,
+                    label = "Home",
+                    onClick = { onSelectTab(RootScreen.HOME) },
+                    testTag = "nav_item_home"
                 )
 
-                Row(
-                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    LiquidGlassNavPill(
-                        selected = currentRootScreen == RootScreen.HOME && !isSubScreenOpen,
-                        selectedIcon = Icons.Rounded.Home,
-                        unselectedIcon = Icons.Outlined.Home,
-                        label = "Home",
-                        onClick = { onSelectTab(RootScreen.HOME) },
-                        testTag = "nav_item_home"
-                    )
-
-                    LiquidGlassNavPill(
-                        selected = currentRootScreen == RootScreen.LIBRARY && !isSubScreenOpen,
-                        selectedIcon = Icons.Rounded.LibraryMusic,
-                        unselectedIcon = Icons.Outlined.LibraryMusic,
-                        label = "Library",
-                        onClick = { onSelectTab(RootScreen.LIBRARY) },
-                        testTag = "nav_item_library"
-                    )
-                }
+                LiquidGlassNavPill(
+                    selected = currentRootScreen == RootScreen.LIBRARY && !isSubScreenOpen,
+                    selectedIcon = Icons.Rounded.LibraryMusic,
+                    unselectedIcon = Icons.Outlined.LibraryMusic,
+                    label = "Library",
+                    onClick = { onSelectTab(RootScreen.LIBRARY) },
+                    testTag = "nav_item_library"
+                )
             }
         }
 
-        // 2. Separate Single Rounded Liquid Glass Search Button with Live Background Reflection in Full Blur
-        Surface(
-            shape = CircleShape,
-            color = Color.Transparent,
-            border = androidx.compose.foundation.BorderStroke(
-                width = 1.3.dp,
-                brush = chamkBorderBrush
-            ),
-            tonalElevation = 12.dp,
-            shadowElevation = 18.dp,
-            modifier = Modifier
-                .onGloballyPositioned { coordinates ->
-                    searchRootOffset = coordinates.positionInRoot()
-                }
-                .testTag("nav_search_container")
+        // 2. Separate Rounded Search Button
+        Box(
+            modifier = navBoxModifier
+                .testTag("nav_search_container"),
+            contentAlignment = Alignment.Center
         ) {
             Box(
-                modifier = Modifier.clip(CircleShape),
+                modifier = Modifier.padding(5.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (backgroundGraphicsLayer != null) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .blur(32.dp)
-                            .drawWithContent {
-                                translate(left = -searchRootOffset.x, top = -searchRootOffset.y) {
-                                    drawLayer(backgroundGraphicsLayer)
-                                }
-                            }
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            if (isDark) {
-                                Color(0xFF10141D).copy(alpha = 0.58f)
-                            } else {
-                                Color(0xFFF8FAFF).copy(alpha = 0.64f)
-                            }
-                        )
-                        .background(
-                            Brush.verticalGradient(
-                                colors = if (isDark) {
-                                    listOf(
-                                        Color.White.copy(alpha = 0.16f),
-                                        Color.White.copy(alpha = 0.03f),
-                                        Color.Transparent
-                                    )
-                                } else {
-                                    listOf(
-                                        Color.White.copy(alpha = 0.78f),
-                                        Color.White.copy(alpha = 0.28f),
-                                        Color.Transparent
-                                    )
-                                }
-                            )
-                        )
+                LiquidGlassNavPill(
+                    selected = currentRootScreen == RootScreen.SEARCH && !isSubScreenOpen,
+                    selectedIcon = Icons.Rounded.Search,
+                    unselectedIcon = Icons.Outlined.Search,
+                    label = "Search",
+                    onClick = { onSelectTab(RootScreen.SEARCH) },
+                    testTag = "nav_item_search"
                 )
-
-                Box(
-                    modifier = Modifier.padding(5.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LiquidGlassNavPill(
-                        selected = currentRootScreen == RootScreen.SEARCH && !isSubScreenOpen,
-                        selectedIcon = Icons.Rounded.Search,
-                        unselectedIcon = Icons.Outlined.Search,
-                        label = "Search",
-                        onClick = { onSelectTab(RootScreen.SEARCH) },
-                        testTag = "nav_item_search"
-                    )
-                }
             }
         }
     }

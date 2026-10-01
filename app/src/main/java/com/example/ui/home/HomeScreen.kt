@@ -40,6 +40,11 @@ import com.example.player.PlayerManager
 import com.example.ui.common.*
 import com.example.ui.theme.AppFontFamily
 import com.example.ui.theme.ThemeManager
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.rememberHazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +64,7 @@ fun HomeScreen(
     val userNickname by themeManager.userNickname.collectAsStateWithLifecycle()
     val userAvatarEmoji by themeManager.userAvatarEmoji.collectAsStateWithLifecycle()
     val userAvatarImageUri by themeManager.userAvatarImageUri.collectAsStateWithLifecycle()
+    val isLiquidGlassEnabled by themeManager.isLiquidGlassEnabled.collectAsStateWithLifecycle()
     var showProfileDialog by remember { mutableStateOf(false) }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -162,17 +168,12 @@ fun HomeScreen(
                 }
             }
             is HomeUiState.Success -> {
-                val feedGraphicsLayer = rememberGraphicsLayer()
+                val homeHazeState = rememberHazeState()
 
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .drawWithContent {
-                            feedGraphicsLayer.record {
-                                this@drawWithContent.drawContent()
-                            }
-                            drawLayer(feedGraphicsLayer)
-                        },
+                        .hazeSource(homeHazeState),
                     contentPadding = PaddingValues(top = 112.dp, bottom = 165.dp) // Leave space for fixed header and floating controls over mask
                 ) {
                     items(state.shelves, key = { it.id }) { shelf ->
@@ -198,21 +199,20 @@ fun HomeScreen(
                     }
                 }
 
-                // Live Background Reflection in Full Blur behind Sticky Top Header
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(114.dp)
-                        .align(Alignment.TopCenter)
-                        .clip(RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp))
-                ) {
+                // Live Background Reflection in Full Blur behind Sticky Top Header when Liquid Glass is ON
+                if (isLiquidGlassEnabled) {
                     Box(
                         modifier = Modifier
-                            .matchParentSize()
-                            .blur(32.dp)
-                            .drawWithContent {
-                                drawLayer(feedGraphicsLayer)
-                            }
+                            .fillMaxWidth()
+                            .height(114.dp)
+                            .align(Alignment.TopCenter)
+                            .hazeBlur(
+                                input = HazeInput.Sources(homeHazeState),
+                                style = HazeBlurStyle {
+                                    blurRadius(28.dp)
+                                    cornerRadius(0.dp)
+                                }
+                            )
                     )
                 }
             }
@@ -228,13 +228,22 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.82f),
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.55f)
+                        if (isLiquidGlassEnabled) {
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.82f),
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.55f)
+                                )
                             )
-                        )
+                        } else {
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.background,
+                                    MaterialTheme.colorScheme.background
+                                )
+                            )
+                        }
                     )
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 12.dp)

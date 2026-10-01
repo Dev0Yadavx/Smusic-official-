@@ -3,16 +3,20 @@ package com.example.ui.settings
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -24,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,13 +56,23 @@ fun SettingsScreen(
     themeManager: ThemeManager = ThemeManager.getInstance(LocalContext.current)
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val equalizerManager = remember { EqualizerManager.getInstance(context) }
     var showEqualizerScreen by rememberSaveable { mutableStateOf(false) }
+    var showLicensesScreen by rememberSaveable { mutableStateOf(false) }
 
     if (showEqualizerScreen) {
         EqualizerScreen(
             onBack = { showEqualizerScreen = false },
             equalizerManager = equalizerManager,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (showLicensesScreen) {
+        OpenSourceLicensesScreen(
+            onBack = { showLicensesScreen = false },
             modifier = modifier
         )
         return
@@ -69,6 +84,7 @@ fun SettingsScreen(
     val currentThemeMode by themeManager.themeMode.collectAsState()
     val useDynamicColor by themeManager.useDynamicColor.collectAsState()
     val isAmoledBlack by themeManager.isAmoledBlack.collectAsState()
+    val isLiquidGlassEnabled by themeManager.isLiquidGlassEnabled.collectAsState()
     val accentPalette by themeManager.accentPalette.collectAsState()
     val currentFontOption by themeManager.fontOption.collectAsState()
     val userNickname by themeManager.userNickname.collectAsState()
@@ -121,16 +137,18 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             contentPadding = PaddingValues(bottom = 165.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Profile Card (Avatar + Nickname, no extra text)
+            // 1. PROFILE CATEGORY (Large Card Style Shape)
             item {
+                SettingsCategoryHeader(title = "Profile")
                 Card(
                     onClick = { showProfileCardDialog = true },
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("settings_profile_m3_card")
@@ -138,190 +156,222 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                            .padding(horizontal = 20.dp, vertical = 18.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             UserAvatarBadge(
                                 emoji = userAvatarEmoji,
                                 customImageUri = userAvatarImageUri,
-                                size = 48.dp,
-                                fontSize = 22.sp
+                                size = 54.dp,
+                                fontSize = 24.sp
                             )
                             Text(
                                 text = userNickname,
-                                style = MaterialTheme.typography.titleMedium.copy(
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                         }
-                        FilledTonalIconButton(
-                            onClick = { showProfileCardDialog = true },
-                            modifier = Modifier.size(38.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                .clickable { showProfileCardDialog = true },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Edit,
                                 contentDescription = "Edit Profile",
-                                modifier = Modifier.size(18.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 }
             }
 
-            // 2. Clean Item Options List (Audio, Equalizer, Appearance, Playback, Data)
+            // 2. AUDIO & PLAYBACK CATEGORY (Large Card Style Shape)
             item {
-                Card(
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        // Equalizer Option Item
-                        SettingsOptionRow(
-                            icon = Icons.Outlined.Equalizer,
-                            title = "Equalizer",
-                            valueText = if (isEqEnabled) selectedEqPreset.displayName else "Off",
-                            onClick = { showEqualizerScreen = true },
-                            testTag = "settings_equalizer_item"
-                        )
+                SettingsCategoryHeader(title = "Audio & Playback")
+                SettingsLargeCard {
+                    // Equalizer Option Item
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.Equalizer,
+                        title = "Equalizer",
+                        valueText = if (isEqEnabled) selectedEqPreset.displayName else "Off",
+                        onClick = { showEqualizerScreen = true },
+                        testTag = "settings_equalizer_item"
+                    )
 
-                        SettingsDivider()
+                    SettingsDivider()
 
-                        // Streaming Quality Option Item
-                        SettingsOptionRow(
-                            icon = Icons.Outlined.HighQuality,
-                            title = "Streaming Quality",
-                            valueText = when (selectedQuality) {
-                                StreamUrlResolver.AudioQuality.HIGH -> "320 kbps"
-                                StreamUrlResolver.AudioQuality.MEDIUM -> "160 kbps"
-                                StreamUrlResolver.AudioQuality.LOW -> "96 kbps"
-                            },
-                            onClick = { showQualityDialog = true },
-                            testTag = "settings_quality_item"
-                        )
+                    // Streaming Quality Option Item
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.HighQuality,
+                        title = "Streaming Quality",
+                        valueText = when (selectedQuality) {
+                            StreamUrlResolver.AudioQuality.HIGH -> "320 kbps"
+                            StreamUrlResolver.AudioQuality.MEDIUM -> "160 kbps"
+                            StreamUrlResolver.AudioQuality.LOW -> "96 kbps"
+                        },
+                        onClick = { showQualityDialog = true },
+                        testTag = "settings_quality_item"
+                    )
 
-                        SettingsDivider()
+                    SettingsDivider()
 
-                        // Autoplay Option Item
-                        SettingsToggleOptionRow(
-                            icon = Icons.Outlined.Autorenew,
-                            title = "Autoplay",
-                            checked = isAutoplayEnabled,
-                            onCheckedChange = { playerManager.setAutoplayEnabled(it) },
-                            testTag = "settings_autoplay_item"
-                        )
+                    // Autoplay Option Item
+                    SettingsToggleOptionRow(
+                        icon = Icons.Outlined.Autorenew,
+                        title = "Autoplay",
+                        checked = isAutoplayEnabled,
+                        onCheckedChange = { playerManager.setAutoplayEnabled(it) },
+                        testTag = "settings_autoplay_item"
+                    )
 
-                        SettingsDivider()
+                    SettingsDivider()
 
-                        // Pause on Disconnect Option Item
-                        SettingsToggleOptionRow(
-                            icon = Icons.Outlined.Headphones,
-                            title = "Pause on Disconnect",
-                            checked = pauseOnDisconnect,
-                            onCheckedChange = { pauseOnDisconnect = it },
-                            testTag = "settings_pause_disconnect_item"
-                        )
+                    // Pause on Disconnect Option Item
+                    SettingsToggleOptionRow(
+                        icon = Icons.Outlined.Headphones,
+                        title = "Pause on Disconnect",
+                        checked = pauseOnDisconnect,
+                        onCheckedChange = { pauseOnDisconnect = it },
+                        testTag = "settings_pause_disconnect_item"
+                    )
+                }
+            }
 
-                        SettingsDivider()
+            // 3. APPEARANCE & CUSTOMIZATION CATEGORY (Large Card Style Shape)
+            item {
+                SettingsCategoryHeader(title = "Appearance & Customization")
+                SettingsLargeCard {
+                    // Theme Mode Option Item
+                    SettingsOptionRow(
+                        icon = when (currentThemeMode) {
+                            ThemeMode.SYSTEM -> Icons.Outlined.BrightnessAuto
+                            ThemeMode.LIGHT -> Icons.Outlined.LightMode
+                            ThemeMode.DARK -> Icons.Outlined.DarkMode
+                        },
+                        title = "Theme Mode",
+                        valueText = when (currentThemeMode) {
+                            ThemeMode.SYSTEM -> "System"
+                            ThemeMode.LIGHT -> "Light"
+                            ThemeMode.DARK -> "Dark"
+                        },
+                        onClick = { showThemeModeDialog = true },
+                        testTag = "settings_theme_mode_item"
+                    )
 
-                        // Theme Mode Option Item
-                        SettingsOptionRow(
-                            icon = when (currentThemeMode) {
-                                ThemeMode.SYSTEM -> Icons.Outlined.BrightnessAuto
-                                ThemeMode.LIGHT -> Icons.Outlined.LightMode
-                                ThemeMode.DARK -> Icons.Outlined.DarkMode
-                            },
-                            title = "Theme Mode",
-                            valueText = when (currentThemeMode) {
-                                ThemeMode.SYSTEM -> "System"
-                                ThemeMode.LIGHT -> "Light"
-                                ThemeMode.DARK -> "Dark"
-                            },
-                            onClick = { showThemeModeDialog = true },
-                            testTag = "settings_theme_mode_item"
-                        )
-
-                        // AMOLED Pure Black Option Item
-                        AnimatedVisibility(visible = currentThemeMode != ThemeMode.LIGHT) {
-                            Column {
-                                SettingsDivider()
-                                SettingsToggleOptionRow(
-                                    icon = Icons.Outlined.Contrast,
-                                    title = "AMOLED Pure Black",
-                                    checked = isAmoledBlack,
-                                    onCheckedChange = { themeManager.setAmoledBlack(it) },
-                                    testTag = "settings_amoled_item"
-                                )
-                            }
-                        }
-
-                        // Dynamic Color Option Item
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // AMOLED Pure Black Option Item
+                    AnimatedVisibility(visible = currentThemeMode != ThemeMode.LIGHT) {
+                        Column {
                             SettingsDivider()
                             SettingsToggleOptionRow(
-                                icon = Icons.Outlined.ColorLens,
-                                title = "Dynamic Color",
-                                checked = useDynamicColor,
-                                onCheckedChange = { themeManager.setDynamicColor(it) },
-                                testTag = "settings_dynamic_color_item"
+                                icon = Icons.Outlined.Contrast,
+                                title = "AMOLED Pure Black",
+                                checked = isAmoledBlack,
+                                onCheckedChange = { themeManager.setAmoledBlack(it) },
+                                testTag = "settings_amoled_item"
                             )
                         }
+                    }
 
-                        // Accent Color Palette Option Item
-                        AnimatedVisibility(visible = !useDynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                            Column {
-                                SettingsDivider()
-                                SettingsOptionRow(
-                                    icon = Icons.Outlined.Palette,
-                                    title = "Accent Color",
-                                    valueText = accentPalette.displayName,
-                                    onClick = { showAccentDialog = true },
-                                    testTag = "settings_accent_color_item"
-                                )
-                            }
-                        }
-
+                    // Dynamic Color Option Item
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         SettingsDivider()
-
-                        // Font Style Option Item
-                        SettingsOptionRow(
-                            icon = Icons.Outlined.TextFields,
-                            title = "Font Style",
-                            valueText = currentFontOption.displayName,
-                            onClick = { showFontDialog = true },
-                            testTag = "settings_font_style_item"
-                        )
-
-                        SettingsDivider()
-
-                        // Clear Search History Option Item
-                        SettingsOptionRow(
-                            icon = Icons.Outlined.History,
-                            title = "Clear Search History",
-                            valueText = null,
-                            onClick = { showClearHistoryDialog = true },
-                            testTag = "settings_clear_search_history_item"
-                        )
-
-                        SettingsDivider()
-
-                        // Clear Recently Played Option Item
-                        SettingsOptionRow(
-                            icon = Icons.Outlined.DeleteSweep,
-                            title = "Clear Recently Played",
-                            valueText = null,
-                            onClick = { showClearRecentDialog = true },
-                            testTag = "settings_clear_recent_item"
+                        SettingsToggleOptionRow(
+                            icon = Icons.Outlined.ColorLens,
+                            title = "Dynamic Color",
+                            checked = useDynamicColor,
+                            onCheckedChange = { themeManager.setDynamicColor(it) },
+                            testTag = "settings_dynamic_color_item"
                         )
                     }
+
+                    // Accent Color Palette Option Item
+                    AnimatedVisibility(visible = !useDynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                        Column {
+                            SettingsDivider()
+                            SettingsOptionRow(
+                                icon = Icons.Outlined.Palette,
+                                title = "Accent Color",
+                                valueText = accentPalette.displayName,
+                                onClick = { showAccentDialog = true },
+                                testTag = "settings_accent_color_item"
+                            )
+                        }
+                    }
+
+                    SettingsDivider()
+
+                    // Liquid Glass On / Off Option Item
+                    SettingsToggleOptionRow(
+                        icon = Icons.Outlined.BlurOn,
+                        title = "Liquid Glass",
+                        checked = isLiquidGlassEnabled,
+                        onCheckedChange = { themeManager.setLiquidGlassEnabled(it) },
+                        testTag = "settings_liquid_glass_item"
+                    )
+
+                    SettingsDivider()
+
+                    // Font Style Option Item
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.TextFields,
+                        title = "Font Style",
+                        valueText = currentFontOption.displayName,
+                        onClick = { showFontDialog = true },
+                        testTag = "settings_font_style_item"
+                    )
+                }
+            }
+
+            // 4. DATA & HISTORY CATEGORY (Large Card Style Shape)
+            item {
+                SettingsCategoryHeader(title = "Data & History")
+                SettingsLargeCard {
+                    // Clear Search History Option Item
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.History,
+                        title = "Clear Search History",
+                        valueText = null,
+                        onClick = { showClearHistoryDialog = true },
+                        testTag = "settings_clear_search_history_item"
+                    )
+
+                    SettingsDivider()
+
+                    // Clear Recently Played Option Item
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.DeleteSweep,
+                        title = "Clear Recently Played",
+                        valueText = null,
+                        onClick = { showClearRecentDialog = true },
+                        testTag = "settings_clear_recent_item"
+                    )
+                }
+            }
+
+            // 5. OPEN SOURCE LICENSES CATEGORY (Single item in Settings -> opens dedicated Layout)
+            item {
+                SettingsCategoryHeader(title = "Open Source & Licenses")
+                SettingsLargeCard {
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.Description,
+                        title = "Open Source Licenses",
+                        valueText = "${allOpenSourceLicenses.size} Libraries",
+                        onClick = { showLicensesScreen = true },
+                        testTag = "settings_open_source_licenses_item"
+                    )
                 }
             }
         }
@@ -521,11 +571,68 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SettingsCategoryHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelLarge.copy(
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.5.sp,
+            letterSpacing = 0.9.sp,
+            color = MaterialTheme.colorScheme.primary
+        ),
+        modifier = Modifier.padding(start = 8.dp, bottom = 10.dp)
+    )
+}
+
+@Composable
+private fun SettingsLargeCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            content = content
+        )
+    }
+}
+
+@Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 18.dp),
+        modifier = Modifier.padding(horizontal = 20.dp),
         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)
     )
+}
+
+@Composable
+private fun SettingsIconSquareBox(
+    icon: ImageVector,
+    contentDescription: String
+) {
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(23.dp)
+        )
+    }
 }
 
 @Composable
@@ -544,40 +651,39 @@ private fun SettingsOptionRow(
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
-        )
+        SettingsIconSquareBox(icon = icon, contentDescription = title)
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 16.5.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         if (!valueText.isNullOrBlank()) {
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
             ) {
                 Text(
                     text = valueText,
                     style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     ),
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(8.dp))
         }
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(22.dp)
         )
     }
 }
@@ -594,20 +700,18 @@ private fun SettingsToggleOptionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 18.dp, vertical = 11.dp)
+            .padding(horizontal = 18.dp, vertical = 13.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
-        )
+        SettingsIconSquareBox(icon = icon, contentDescription = title)
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 16.5.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
@@ -643,5 +747,509 @@ private fun DialogRadioOptionItem(
             selected = selected,
             onClick = onClick
         )
+    }
+}
+
+data class OpenSourceLicenseItem(
+    val id: String,
+    val name: String,
+    val category: String,
+    val version: String,
+    val author: String,
+    val licenseName: String,
+    val description: String,
+    val projectUrl: String,
+    val licenseUrl: String,
+    val icon: ImageVector
+)
+
+private val allOpenSourceLicenses = listOf(
+    OpenSourceLicenseItem(
+        id = "jetpack_compose",
+        name = "Jetpack Compose & Material 3",
+        category = "UI & Compose",
+        version = "BOM 2024.09.00",
+        author = "Google / AndroidX",
+        licenseName = "Apache-2.0",
+        description = "Modern declarative UI toolkit and Material Design 3 components for Android.",
+        projectUrl = "https://developer.android.com/jetpack/compose",
+        licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0",
+        icon = Icons.Outlined.Layers
+    ),
+    OpenSourceLicenseItem(
+        id = "haze_blur",
+        name = "Haze Blur & Liquid Glass",
+        category = "UI & Compose",
+        version = "2.0.1",
+        author = "Chris Banes",
+        licenseName = "Apache-2.0",
+        description = "Hardware-accelerated glassmorphism and background blur effects for Compose.",
+        projectUrl = "https://github.com/chrisbanes/haze",
+        licenseUrl = "https://github.com/chrisbanes/haze/blob/main/LICENSE",
+        icon = Icons.Outlined.BlurOn
+    ),
+    OpenSourceLicenseItem(
+        id = "media3_exoplayer",
+        name = "AndroidX Media3 ExoPlayer",
+        category = "Audio & Media",
+        version = "1.5.1",
+        author = "Google / AndroidX",
+        licenseName = "Apache-2.0",
+        description = "High-performance media playback engine, MediaSession, and audio streaming pipeline.",
+        projectUrl = "https://github.com/androidx/media",
+        licenseUrl = "https://github.com/androidx/media/blob/release/LICENSE",
+        icon = Icons.Outlined.GraphicEq
+    ),
+    OpenSourceLicenseItem(
+        id = "coil_compose",
+        name = "Coil Compose",
+        category = "UI & Compose",
+        version = "2.7.0",
+        author = "Coil Contributors",
+        licenseName = "Apache-2.0",
+        description = "Coroutine-based image loading library for Android and Jetpack Compose.",
+        projectUrl = "https://github.com/coil-kt/coil",
+        licenseUrl = "https://github.com/coil-kt/coil/blob/main/LICENSE.txt",
+        icon = Icons.Outlined.Image
+    ),
+    OpenSourceLicenseItem(
+        id = "retrofit",
+        name = "Retrofit 2",
+        category = "Networking & Data",
+        version = "2.12.0",
+        author = "Square, Inc.",
+        licenseName = "Apache-2.0",
+        description = "Type-safe HTTP client for Android and Kotlin REST API integration.",
+        projectUrl = "https://github.com/square/retrofit",
+        licenseUrl = "https://github.com/square/retrofit/blob/trunk/LICENSE.txt",
+        icon = Icons.Outlined.CloudSync
+    ),
+    OpenSourceLicenseItem(
+        id = "okhttp",
+        name = "OkHttp & Logging Interceptor",
+        category = "Networking & Data",
+        version = "4.10.0",
+        author = "Square, Inc.",
+        licenseName = "Apache-2.0",
+        description = "Resilient HTTP/2 client with connection pooling, caching, and stream handling.",
+        projectUrl = "https://github.com/square/okhttp",
+        licenseUrl = "https://github.com/square/okhttp/blob/master/LICENSE.txt",
+        icon = Icons.Outlined.Http
+    ),
+    OpenSourceLicenseItem(
+        id = "room_database",
+        name = "AndroidX Room Database",
+        category = "Networking & Data",
+        version = "2.7.0",
+        author = "Google / AndroidX",
+        licenseName = "Apache-2.0",
+        description = "SQLite object mapping library for offline tracks, playlists, and history persistence.",
+        projectUrl = "https://developer.android.com/training/data-storage/room",
+        licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0",
+        icon = Icons.Outlined.Storage
+    ),
+    OpenSourceLicenseItem(
+        id = "kotlin_coroutines",
+        name = "Kotlin & Kotlinx Coroutines",
+        category = "Networking & Data",
+        version = "1.10.2",
+        author = "JetBrains",
+        licenseName = "Apache-2.0",
+        description = "Asynchronous reactive programming with StateFlow, SharedFlow, and structured concurrency.",
+        projectUrl = "https://github.com/Kotlin/kotlinx.coroutines",
+        licenseUrl = "https://github.com/Kotlin/kotlinx.coroutines/blob/master/LICENSE.txt",
+        icon = Icons.Outlined.Code
+    ),
+    OpenSourceLicenseItem(
+        id = "moshi_gson",
+        name = "Moshi & Google Gson",
+        category = "Networking & Data",
+        version = "1.15.2 / 2.11.0",
+        author = "Square & Google",
+        licenseName = "Apache-2.0",
+        description = "Modern JSON serialization and deserialization libraries for Kotlin and Java.",
+        projectUrl = "https://github.com/square/moshi",
+        licenseUrl = "https://github.com/square/moshi/blob/master/LICENSE.txt",
+        icon = Icons.Outlined.DataObject
+    ),
+    OpenSourceLicenseItem(
+        id = "androidx_lifecycle",
+        name = "AndroidX Lifecycle & Core KTX",
+        category = "UI & Compose",
+        version = "2.8.7 / 1.18.0",
+        author = "Google / AndroidX",
+        licenseName = "Apache-2.0",
+        description = "Lifecycle-aware ViewModel, Compose state collection, and Android core extensions.",
+        projectUrl = "https://developer.android.com/jetpack/androidx/releases/lifecycle",
+        licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0",
+        icon = Icons.Outlined.Extension
+    ),
+    OpenSourceLicenseItem(
+        id = "plus_jakarta_sans",
+        name = "Plus Jakarta Sans Font",
+        category = "Fonts & Design",
+        version = "OFL 1.1",
+        author = "Tokotype / Google Fonts",
+        licenseName = "OFL-1.1",
+        description = "Geometric modern sans-serif typeface used for bold song titles and italic artist names.",
+        projectUrl = "https://fonts.google.com/specimen/Plus+Jakarta+Sans",
+        licenseUrl = "https://openfontlicense.org",
+        icon = Icons.Outlined.FontDownload
+    ),
+    OpenSourceLicenseItem(
+        id = "poppins_inter_fonts",
+        name = "Poppins, Inter & Figtree Fonts",
+        category = "Fonts & Design",
+        version = "OFL 1.1",
+        author = "Google Fonts Contributors",
+        licenseName = "OFL-1.1",
+        description = "Open-source studio typography families bundled for customizable app font styles.",
+        projectUrl = "https://fonts.google.com",
+        licenseUrl = "https://openfontlicense.org",
+        icon = Icons.Outlined.TextFields
+    ),
+    OpenSourceLicenseItem(
+        id = "material_icons",
+        name = "Material Symbols & Icons",
+        category = "Fonts & Design",
+        version = "Material 3",
+        author = "Google Design",
+        licenseName = "Apache-2.0",
+        description = "Official Material Design 3 vector icons and symbols for Android.",
+        projectUrl = "https://fonts.google.com/icons",
+        licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0",
+        icon = Icons.Outlined.AutoAwesome
+    ),
+    OpenSourceLicenseItem(
+        id = "google_ksp",
+        name = "Kotlin Symbol Processing (KSP)",
+        category = "Build & Tooling",
+        version = "2.2.10-2.0.2",
+        author = "Google",
+        licenseName = "Apache-2.0",
+        description = "Compiler plugin API used for Room and Moshi code generation.",
+        projectUrl = "https://github.com/google/ksp",
+        licenseUrl = "https://github.com/google/ksp/blob/main/LICENSE",
+        icon = Icons.Outlined.Build
+    ),
+    OpenSourceLicenseItem(
+        id = "secrets_gradle_plugin",
+        name = "Secrets Gradle Plugin",
+        category = "Build & Tooling",
+        version = "2.0.1",
+        author = "Google Maps Platform",
+        licenseName = "Apache-2.0",
+        description = "Gradle plugin for securely providing environment properties and BuildConfig keys.",
+        projectUrl = "https://github.com/google/secrets-gradle-plugin",
+        licenseUrl = "https://github.com/google/secrets-gradle-plugin/blob/main/LICENSE",
+        icon = Icons.Outlined.VpnKey
+    ),
+    OpenSourceLicenseItem(
+        id = "lrclib_lyrics",
+        name = "LRCLIB Synced Lyrics",
+        category = "Audio & Media",
+        version = "API v1",
+        author = "Tran Xuan Thang",
+        licenseName = "MIT",
+        description = "Open-source community database providing time-synced LRC and plain lyrics.",
+        projectUrl = "https://github.com/tranxuanthang/lrclib",
+        licenseUrl = "https://github.com/tranxuanthang/lrclib/blob/main/LICENSE",
+        icon = Icons.Outlined.Lyrics
+    ),
+    OpenSourceLicenseItem(
+        id = "aosp_audiofx",
+        name = "Android Open Source Project (AOSP)",
+        category = "Audio & Media",
+        version = "Android SDK 36",
+        author = "Google / AOSP",
+        licenseName = "Apache-2.0",
+        description = "Core Android OS framework, AudioEffect Equalizer, BassBoost, and system media APIs.",
+        projectUrl = "https://source.android.com",
+        licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0",
+        icon = Icons.Outlined.PhoneAndroid
+    )
+)
+
+@Composable
+private fun SettingsDirectLinkRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    badgeText: String,
+    onClick: () -> Unit,
+    onLicenseClick: () -> Unit,
+    testTag: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SettingsIconSquareBox(icon = icon, contentDescription = title)
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Surface(
+            onClick = onLicenseClick,
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        ) {
+            Text(
+                text = badgeText,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+            contentDescription = "Open Direct Link",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(19.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OpenSourceLicensesScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BackHandler { onBack() }
+    val uriHandler = LocalUriHandler.current
+    val categories = remember {
+        listOf("All") + allOpenSourceLicenses.map { it.category }.distinct()
+    }
+    var selectedCategory by remember { mutableStateOf("All") }
+
+    val filteredLicenses = remember(selectedCategory) {
+        if (selectedCategory == "All") {
+            allOpenSourceLicenses
+        } else {
+            allOpenSourceLicenses.filter { it.category == selectedCategory }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Open Source Licenses", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                }
+            )
+        },
+        modifier = modifier
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 165.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Category Filter Chips
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(categories) { category ->
+                        FilterChip(
+                            selected = selectedCategory == category,
+                            onClick = { selectedCategory = category },
+                            label = {
+                                Text(
+                                    text = category,
+                                    fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                }
+            }
+
+            // Direct Links for Official Licenses under a single Large Card Layout
+            item {
+                SettingsCategoryHeader(title = "Standard License Texts (Direct Links)")
+                SettingsLargeCard {
+                    SettingsDirectLinkRow(
+                        icon = Icons.Outlined.Gavel,
+                        title = "Apache License 2.0",
+                        subtitle = "apache.org/licenses/LICENSE-2.0",
+                        badgeText = "Apache-2.0",
+                        onClick = {
+                            runCatching { uriHandler.openUri("https://www.apache.org/licenses/LICENSE-2.0") }
+                        },
+                        onLicenseClick = {
+                            runCatching { uriHandler.openUri("https://www.apache.org/licenses/LICENSE-2.0") }
+                        },
+                        testTag = "standard_license_apache"
+                    )
+                    SettingsDivider()
+                    SettingsDirectLinkRow(
+                        icon = Icons.Outlined.FontDownload,
+                        title = "SIL Open Font License 1.1",
+                        subtitle = "openfontlicense.org",
+                        badgeText = "OFL-1.1",
+                        onClick = {
+                            runCatching { uriHandler.openUri("https://openfontlicense.org") }
+                        },
+                        onLicenseClick = {
+                            runCatching { uriHandler.openUri("https://openfontlicense.org") }
+                        },
+                        testTag = "standard_license_ofl"
+                    )
+                    SettingsDivider()
+                    SettingsDirectLinkRow(
+                        icon = Icons.Outlined.Verified,
+                        title = "MIT Open Source License",
+                        subtitle = "opensource.org/licenses/MIT",
+                        badgeText = "MIT",
+                        onClick = {
+                            runCatching { uriHandler.openUri("https://opensource.org/licenses/MIT") }
+                        },
+                        onLicenseClick = {
+                            runCatching { uriHandler.openUri("https://opensource.org/licenses/MIT") }
+                        },
+                        testTag = "standard_license_mit"
+                    )
+                }
+            }
+
+            // All Open Source Libraries grouped together inside ONE Large Card Layout
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                SettingsCategoryHeader(title = "All Libraries & Direct Links (${filteredLicenses.size})")
+                SettingsLargeCard {
+                    filteredLicenses.forEachIndexed { index, item ->
+                        if (index > 0) {
+                            SettingsDivider()
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    runCatching { uriHandler.openUri(item.projectUrl) }
+                                }
+                                .padding(horizontal = 18.dp, vertical = 16.dp)
+                                .testTag("license_card_${item.id}"),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SettingsIconSquareBox(
+                                    icon = item.icon,
+                                    contentDescription = item.name
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontSize = 16.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${item.author} • v${item.version}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Surface(
+                                    onClick = {
+                                        runCatching { uriHandler.openUri(item.licenseUrl) }
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = item.licenseName,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = item.description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        runCatching { uriHandler.openUri(item.projectUrl) }
+                                    },
+                                    shape = RoundedCornerShape(14.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Direct Project Link", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        runCatching { uriHandler.openUri(item.licenseUrl) }
+                                    },
+                                    shape = RoundedCornerShape(14.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Description,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("License Link", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

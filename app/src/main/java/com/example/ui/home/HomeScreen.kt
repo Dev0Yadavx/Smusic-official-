@@ -1,6 +1,7 @@
 package com.example.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -40,11 +42,6 @@ import com.example.player.PlayerManager
 import com.example.ui.common.*
 import com.example.ui.theme.AppFontFamily
 import com.example.ui.theme.ThemeManager
-import dev.chrisbanes.haze.HazeInput
-import dev.chrisbanes.haze.rememberHazeState
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.hazeBlur
-import dev.chrisbanes.haze.hazeSource
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,7 +89,7 @@ fun HomeScreen(
         state = pullRefreshState,
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(Color.Transparent),
         indicator = {
             if (isRefreshing) {
                 Column(
@@ -168,12 +165,8 @@ fun HomeScreen(
                 }
             }
             is HomeUiState.Success -> {
-                val homeHazeState = rememberHazeState()
-
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .hazeSource(homeHazeState),
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 112.dp, bottom = 165.dp) // Leave space for fixed header and floating controls over mask
                 ) {
                     items(state.shelves, key = { it.id }) { shelf ->
@@ -198,55 +191,29 @@ fun HomeScreen(
                         )
                     }
                 }
-
-                // Live Background Reflection in Full Blur behind Sticky Top Header when Liquid Glass is ON
-                if (isLiquidGlassEnabled) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(114.dp)
-                            .align(Alignment.TopCenter)
-                            .hazeBlur(
-                                input = HazeInput.Sources(homeHazeState),
-                                style = HazeBlurStyle {
-                                    blurRadius(28.dp)
-                                    cornerRadius(0.dp)
-                                }
-                            )
-                    )
-                }
             }
         }
 
-        // Fixed Sticky Header with Full Blur Background Reflection
+        // Fixed Sticky Header with Mask Style and Frosted Greeting Card
+        val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to MaterialTheme.colorScheme.background.copy(alpha = if (isDark) 0.85f else 0.90f),
+                        0.70f to MaterialTheme.colorScheme.background.copy(alpha = if (isDark) 0.50f else 0.55f),
+                        1.0f to Color.Transparent
+                    )
+                )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        if (isLiquidGlassEnabled) {
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.82f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.55f)
-                                )
-                            )
-                        } else {
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background,
-                                    MaterialTheme.colorScheme.background
-                                )
-                            )
-                        }
-                    )
                     .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -254,13 +221,18 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // 1. SMusic Brand Upper
+                        // 1. SMusic Brand Upper (Clear & Vibrant)
                         Text(
                             text = "SMusic",
                             style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 26.sp,
+                                letterSpacing = (-0.5).sp,
                                 brush = Brush.linearGradient(
                                     colors = listOf(
                                         MaterialTheme.colorScheme.primary,
@@ -270,43 +242,75 @@ fun HomeScreen(
                             )
                         )
 
-                        // 2. Good Morning Niche with Avatar & Nickname right next to it (no extra text)
+                        // 2. Good Morning Niche with Mask Styled Frosted Glass Pill (Shows clear Nickname)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier
-                                .clip(CircleShape)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(
+                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.72f)
+                                    else Color.White.copy(alpha = 0.88f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isDark) Color.White.copy(alpha = 0.16f)
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+                                    RoundedCornerShape(24.dp)
+                                )
                                 .clickable { showProfileDialog = true }
-                                .padding(end = 6.dp, top = 2.dp, bottom = 2.dp)
+                                .padding(horizontal = 9.dp, vertical = 5.dp)
                                 .testTag("home_greeting_profile_row")
                         ) {
                             UserAvatarBadge(
                                 emoji = userAvatarEmoji,
                                 customImageUri = userAvatarImageUri,
-                                size = 26.dp,
-                                fontSize = 14.sp,
+                                size = 36.dp,
+                                fontSize = 17.sp,
                                 onClick = { showProfileDialog = true }
                             )
-                            Text(
-                                text = "$greeting, $userNickname",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(0.dp)
+                            ) {
+                                Text(
+                                    text = greeting,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        letterSpacing = 0.3.sp
+                                    )
+                                )
+                                Text(
+                                    text = userNickname,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 14.5.sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         IconButton(
                             onClick = onNavigateToSearch,
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                                .background(
+                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.72f)
+                                    else Color.White.copy(alpha = 0.88f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isDark) Color.White.copy(alpha = 0.16f)
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+                                    CircleShape
+                                )
                                 .testTag("home_search_button")
                         ) {
                             Icon(
@@ -322,7 +326,16 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                                .background(
+                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.72f)
+                                    else Color.White.copy(alpha = 0.88f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isDark) Color.White.copy(alpha = 0.16f)
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+                                    CircleShape
+                                )
                                 .testTag("home_settings_button")
                         ) {
                             Icon(
@@ -335,21 +348,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            // Gradient Mask Fade Effect (Songs smoothly fade under header as they scroll)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(22.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.75f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
         }
     }
 

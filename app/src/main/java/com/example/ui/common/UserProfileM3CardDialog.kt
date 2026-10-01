@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.ui.theme.MiniPlayerScallopedShape
 import com.example.ui.theme.ThemeManager
 import java.io.File
 
@@ -55,15 +56,16 @@ val PRESET_AVATAR_EMOJIS = listOf(
 fun UserAvatarBadge(
     emoji: String,
     customImageUri: String?,
-    size: Dp = 32.dp,
-    fontSize: TextUnit = 16.sp,
+    size: Dp = 36.dp,
+    fontSize: TextUnit = 17.sp,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val avatarShape = MiniPlayerScallopedShape
     val baseModifier = modifier
         .size(size)
-        .clip(CircleShape)
+        .clip(avatarShape)
         .background(
             Brush.linearGradient(
                 colors = listOf(
@@ -74,15 +76,15 @@ fun UserAvatarBadge(
         )
         .border(
             BorderStroke(
-                width = 1.2.dp,
+                width = 1.4.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        colorScheme.primary.copy(alpha = 0.7f),
-                        colorScheme.tertiary.copy(alpha = 0.5f)
+                        colorScheme.primary.copy(alpha = 0.75f),
+                        colorScheme.tertiary.copy(alpha = 0.55f)
                     )
                 )
             ),
-            shape = CircleShape
+            shape = avatarShape
         )
         .then(
             if (onClick != null) {
@@ -106,7 +108,7 @@ fun UserAvatarBadge(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(CircleShape)
+                    .clip(avatarShape)
             )
         } else {
             Text(

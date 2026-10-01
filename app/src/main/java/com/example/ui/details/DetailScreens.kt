@@ -78,7 +78,7 @@ fun AlbumDetailScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Transparent)
     ) {
         when (val result = albumResult) {
             is NetworkResult.Loading -> {
@@ -370,7 +370,7 @@ fun AlbumDetailScreen(
                                         .testTag("album_play_fab")
                                 ) {
                                     Icon(
-                                        imageVector = if (isCurrentAlbumPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                        imageVector = if (isCurrentAlbumPlaying) Icons.Rounded.Pause else com.example.ui.theme.AppIcons.PlayArrow,
                                         contentDescription = "Play Album",
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(30.dp)
@@ -489,7 +489,7 @@ fun PlaylistDetailScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Transparent)
     ) {
         when (val result = playlistResult) {
             is NetworkResult.Loading -> {
@@ -796,7 +796,7 @@ fun PlaylistDetailScreen(
                                         .testTag("playlist_play_fab")
                                 ) {
                                     Icon(
-                                        imageVector = if (isCurrentPlaylistPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                        imageVector = if (isCurrentPlaylistPlaying) Icons.Rounded.Pause else com.example.ui.theme.AppIcons.PlayArrow,
                                         contentDescription = "Play",
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(30.dp)
@@ -927,7 +927,7 @@ fun ArtistDetailScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Transparent)
     ) {
         when (val result = artistResult) {
             is NetworkResult.Loading -> {
@@ -1189,7 +1189,7 @@ fun ArtistDetailScreen(
                                     .testTag("artist_play_fab")
                             ) {
                                 Icon(
-                                    imageVector = if (isCurrentArtistPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                    imageVector = if (isCurrentArtistPlaying) Icons.Rounded.Pause else com.example.ui.theme.AppIcons.PlayArrow,
                                     contentDescription = "Play Artist",
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(32.dp)

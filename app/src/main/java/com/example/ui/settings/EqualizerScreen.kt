@@ -1,6 +1,7 @@
 package com.example.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -47,7 +50,10 @@ fun EqualizerScreen(
     val maxBandLevel by equalizerManager.maxBandLevel.collectAsState()
     val bassBoostStrength by equalizerManager.bassBoostStrength.collectAsState()
 
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -75,7 +81,10 @@ fun EqualizerScreen(
                             .padding(end = 16.dp)
                             .testTag("equalizer_master_switch")
                     )
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
         },
         modifier = modifier.testTag("equalizer_screen")
@@ -91,9 +100,15 @@ fun EqualizerScreen(
             // Presets Item Options Card (Only clean item options, no extra text)
             item {
                 Card(
-                    shape = RoundedCornerShape(22.dp),
+                    shape = RoundedCornerShape(26.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = if (isDark) Color(0xFF191924).copy(alpha = 0.75f)
+                        else Color.White.copy(alpha = 0.85f)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isDark) Color.White.copy(alpha = 0.16f)
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -162,9 +177,15 @@ fun EqualizerScreen(
             // Frequency Bands & Bass Boost Controls Card
             item {
                 Card(
-                    shape = RoundedCornerShape(22.dp),
+                    shape = RoundedCornerShape(26.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = if (isDark) Color(0xFF191924).copy(alpha = 0.75f)
+                        else Color.White.copy(alpha = 0.85f)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isDark) Color.White.copy(alpha = 0.16f)
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
                     ),
                     modifier = Modifier
                         .fillMaxWidth()

@@ -131,6 +131,11 @@ class ThemeManager private constructor(context: Context) {
     )
     val isLiquidGlassEnabled: StateFlow<Boolean> = _isLiquidGlassEnabled.asStateFlow()
 
+    private val _isDynamicSongBackgroundEnabled = MutableStateFlow(
+        prefs.getBoolean(KEY_DYNAMIC_SONG_BACKGROUND, true)
+    )
+    val isDynamicSongBackgroundEnabled: StateFlow<Boolean> = _isDynamicSongBackgroundEnabled.asStateFlow()
+
     private val _accentPalette = MutableStateFlow(
         AccentPalette.fromId(prefs.getString(KEY_ACCENT_PALETTE, AccentPalette.VIOLET.id) ?: AccentPalette.VIOLET.id)
     )
@@ -184,6 +189,11 @@ class ThemeManager private constructor(context: Context) {
     fun setLiquidGlassEnabled(enabled: Boolean) {
         _isLiquidGlassEnabled.value = enabled
         prefs.edit().putBoolean(KEY_LIQUID_GLASS_ENABLED, enabled).apply()
+    }
+
+    fun setDynamicSongBackgroundEnabled(enabled: Boolean) {
+        _isDynamicSongBackgroundEnabled.value = enabled
+        prefs.edit().putBoolean(KEY_DYNAMIC_SONG_BACKGROUND, enabled).apply()
     }
 
     fun setAccentPalette(palette: AccentPalette) {
@@ -249,6 +259,7 @@ class ThemeManager private constructor(context: Context) {
         private const val KEY_DYNAMIC_COLOR = "key_dynamic_color"
         private const val KEY_AMOLED_BLACK = "key_amoled_black"
         private const val KEY_LIQUID_GLASS_ENABLED = "key_liquid_glass_enabled"
+        private const val KEY_DYNAMIC_SONG_BACKGROUND = "key_dynamic_song_background"
         private const val KEY_ACCENT_PALETTE = "key_accent_palette"
         private const val KEY_FONT_OPTION = "key_font_option_v2"
         private const val KEY_NOW_PLAYING_STYLE = "key_now_playing_style"

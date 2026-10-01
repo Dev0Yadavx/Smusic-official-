@@ -188,7 +188,7 @@ fun SearchScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(Color.Transparent)
                     .statusBarsPadding()
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
@@ -336,7 +336,7 @@ fun SearchScreen(
                 }
             }
         },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         modifier = modifier
     ) { innerPadding ->
         Box(
@@ -351,7 +351,7 @@ fun SearchScreen(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background),
+                            .background(Color.Transparent),
                         contentPadding = PaddingValues(bottom = 165.dp)
                     ) {
                         // Quick Search term submit row

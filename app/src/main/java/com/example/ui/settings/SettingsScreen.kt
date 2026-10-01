@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -85,6 +87,7 @@ fun SettingsScreen(
     val useDynamicColor by themeManager.useDynamicColor.collectAsState()
     val isAmoledBlack by themeManager.isAmoledBlack.collectAsState()
     val isLiquidGlassEnabled by themeManager.isLiquidGlassEnabled.collectAsState()
+    val isDynamicSongBackgroundEnabled by themeManager.isDynamicSongBackgroundEnabled.collectAsState()
     val accentPalette by themeManager.accentPalette.collectAsState()
     val currentFontOption by themeManager.fontOption.collectAsState()
     val userNickname by themeManager.userNickname.collectAsState()
@@ -115,6 +118,7 @@ fun SettingsScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Settings", fontWeight = FontWeight.Bold) },
@@ -125,7 +129,10 @@ fun SettingsScreen(
                             contentDescription = "Back"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -141,14 +148,20 @@ fun SettingsScreen(
         ) {
             // 1. PROFILE CATEGORY (Large Card Style Shape)
             item {
+                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
                 SettingsCategoryHeader(title = "Profile")
                 Card(
                     onClick = { showProfileCardDialog = true },
                     shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+                        containerColor = if (isDark) Color(0xFF191924).copy(alpha = 0.75f)
+                        else Color.White.copy(alpha = 0.85f)
                     ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isDark) Color.White.copy(alpha = 0.16f)
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("settings_profile_m3_card")
@@ -161,14 +174,17 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             UserAvatarBadge(
                                 emoji = userAvatarEmoji,
                                 customImageUri = userAvatarImageUri,
-                                size = 54.dp,
-                                fontSize = 24.sp
+                                size = 60.dp,
+                                fontSize = 27.sp
                             )
                             Text(
                                 text = userNickname,
@@ -176,7 +192,9 @@ fun SettingsScreen(
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
-                                )
+                                ),
+                                maxLines = 2,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                         Box(
@@ -184,6 +202,7 @@ fun SettingsScreen(
                                 .size(46.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
                                 .clickable { showProfileCardDialog = true },
                             contentAlignment = Alignment.Center
                         ) {
@@ -320,6 +339,18 @@ fun SettingsScreen(
                         checked = isLiquidGlassEnabled,
                         onCheckedChange = { themeManager.setLiquidGlassEnabled(it) },
                         testTag = "settings_liquid_glass_item"
+                    )
+
+                    SettingsDivider()
+
+                    // Dynamic Song Background On / Off Option Item
+                    SettingsToggleOptionRow(
+                        icon = Icons.Outlined.Wallpaper,
+                        title = "Dynamic Background",
+                        subtitle = "Apply blurred album artwork across all app screens",
+                        checked = isDynamicSongBackgroundEnabled,
+                        onCheckedChange = { themeManager.setDynamicSongBackgroundEnabled(it) },
+                        testTag = "settings_dynamic_song_background_item"
                     )
 
                     SettingsDivider()
@@ -589,12 +620,18 @@ private fun SettingsLargeCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Card(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+            containerColor = if (isDark) Color(0xFF191924).copy(alpha = 0.75f)
+            else Color.White.copy(alpha = 0.85f)
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
+        border = BorderStroke(
+            1.dp,
+            if (isDark) Color.White.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
+        ),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -622,8 +659,13 @@ private fun SettingsIconSquareBox(
     Box(
         modifier = Modifier
             .size(46.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                RoundedCornerShape(16.dp)
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -694,7 +736,8 @@ private fun SettingsToggleOptionRow(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    testTag: String
+    testTag: String,
+    subtitle: String? = null
 ) {
     Row(
         modifier = Modifier
@@ -706,15 +749,27 @@ private fun SettingsToggleOptionRow(
     ) {
         SettingsIconSquareBox(icon = icon, contentDescription = title)
         Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 16.5.sp,
-                fontWeight = FontWeight.SemiBold
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 16.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                    )
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange
@@ -1049,6 +1104,7 @@ fun OpenSourceLicensesScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Open Source Licenses", fontWeight = FontWeight.Bold) },
@@ -1059,7 +1115,10 @@ fun OpenSourceLicensesScreen(
                             contentDescription = "Back"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
         },
         modifier = modifier

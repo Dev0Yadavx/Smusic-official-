@@ -460,7 +460,7 @@ fun MiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Full Rounded Album Art with Circular Progress Ring & Spin Animation
@@ -473,7 +473,7 @@ fun MiniPlayer(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
-                    strokeWidth = 2.5.dp
+                    strokeWidth = 2.6.dp
                 )
                 Box(
                     modifier = Modifier
@@ -511,7 +511,7 @@ fun MiniPlayer(
                     maxLines = 1,
                     modifier = Modifier.basicMarquee()
                 )
-                Spacer(modifier = Modifier.height(1.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = track.artist,
                     fontFamily = AppFontFamily,
@@ -522,7 +522,7 @@ fun MiniPlayer(
                         fontStyle = FontStyle.Italic,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
+                        fontSize = 12.2.sp
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -543,7 +543,7 @@ fun MiniPlayer(
                         }
                     },
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(36.dp)
                         .scale(heartScale)
                         .testTag("mini_player_like")
                 ) {
@@ -556,10 +556,12 @@ fun MiniPlayer(
                 }
             }
 
-            // Play / Pause Button in Full Rounded Circle Container
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Play / Pause Button in Profile Scalloped Shape Container
             Surface(
                 onClick = { playerManager.playPause() },
-                shape = CircleShape,
+                shape = MiniPlayerScallopedShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier
@@ -571,11 +573,11 @@ fun MiniPlayer(
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.2.dp
                         )
                     } else {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            imageVector = if (isPlaying) Icons.Rounded.Pause else AppIcons.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(22.dp)
@@ -584,25 +586,21 @@ fun MiniPlayer(
                 }
             }
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(3.dp))
 
             // Next Track Button
-            Surface(
+            IconButton(
                 onClick = { playerManager.skipToNext() },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .testTag("mini_player_next")
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = AppIcons.SkipNext,
-                        contentDescription = "Next Track",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                Icon(
+                    imageVector = AppIcons.SkipNext,
+                    contentDescription = "Next Track",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(21.dp)
+                )
             }
         }
     }
@@ -763,11 +761,25 @@ fun NowPlayingModal(
             formatTime = formatTime,
             isLiked = isLiked,
             likeScale = likeScale,
+            isDownloaded = isDownloaded,
+            isDownloading = isDownloading,
             errorMessage = errorMessage,
             dynamicColors = dynamicColors,
             onToggleLike = {
                 likeAnimateTrigger = true
                 scope.launch { repository.toggleLike(currentT) }
+            },
+            onDownload = {
+                if (isDownloading) {
+                    downloadManager.cancelDownload(currentT.id)
+                    Toast.makeText(context, "Download cancelled", Toast.LENGTH_SHORT).show()
+                } else if (isDownloaded) {
+                    downloadManager.deleteDownloadedSong(currentT.id)
+                    Toast.makeText(context, "Song deleted from downloads", Toast.LENGTH_SHORT).show()
+                } else {
+                    downloadManager.startDownload(currentT, "320")
+                    Toast.makeText(context, "Downloading ${currentT.title}...", Toast.LENGTH_SHORT).show()
+                }
             },
             onMoreOptions = { showMoreOptionsSheet = true },
             onSeek = { pos ->
@@ -1086,9 +1098,12 @@ fun ImmersivePosterNowPlayingLayout(
     formatTime: (Long) -> String,
     isLiked: Boolean,
     likeScale: Float,
+    isDownloaded: Boolean,
+    isDownloading: Boolean,
     errorMessage: String?,
     dynamicColors: DynamicSongColors,
     onToggleLike: () -> Unit,
+    onDownload: () -> Unit,
     onMoreOptions: () -> Unit,
     onSeek: (Float) -> Unit,
     onSeekFinished: () -> Unit,
@@ -1100,8 +1115,8 @@ fun ImmersivePosterNowPlayingLayout(
     onOpenLyrics: () -> Unit,
     onOpenDeviceSelector: () -> Unit
 ) {
-    // Toggle between Full-Screen Poster Art Cover and Spotify-Style Square Art Cover on tap
-    var isSpotifyStyleCover by remember { mutableStateOf(false) }
+    // Toggle between Full-Screen Poster Art Cover and Large Spotify-Style Square Art Cover on tap
+    var isSpotifyStyleCover by remember { mutableStateOf(true) }
 
     // Real-time connected audio output device (Bluetooth, Headphones, USB, or Speaker)
     val activeAudioDevice = rememberActiveAudioOutputDevice()
@@ -1259,22 +1274,22 @@ fun ImmersivePosterNowPlayingLayout(
                     enter = fadeIn(tween(280)) + scaleIn(initialScale = 0.86f, animationSpec = tween(320, easing = FastOutSlowInEasing)),
                     exit = fadeOut(tween(220)) + scaleOut(targetScale = 0.90f, animationSpec = tween(240))
                 ) {
-                    // Spotify-Style Centered Square Album Cover Card
+                    // Large Spotify-Style Centered Square Album Cover Card
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.88f)
+                            .fillMaxWidth(1f)
                             .aspectRatio(1f)
                             .shadow(
-                                elevation = 28.dp,
-                                shape = RoundedCornerShape(16.dp),
+                                elevation = 32.dp,
+                                shape = RoundedCornerShape(22.dp),
                                 spotColor = dynamicColors.primary.copy(alpha = 0.55f)
                             )
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(22.dp))
                             .background(Color(0xFF16191D))
                             .border(
                                 width = 1.dp,
-                                color = Color.White.copy(alpha = 0.14f),
-                                shape = RoundedCornerShape(16.dp)
+                                color = Color.White.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(22.dp)
                             )
                     ) {
                         AsyncImage(
@@ -1313,7 +1328,7 @@ fun ImmersivePosterNowPlayingLayout(
                 }
             }
 
-            // Track Title & Artist Info with Like & More Buttons
+            // Track Title & Artist Info with Segmented White Like, Download & More Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -1321,7 +1336,7 @@ fun ImmersivePosterNowPlayingLayout(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 8.dp)
+                        .padding(end = 10.dp)
                 ) {
                     Text(
                         text = track.title,
@@ -1355,37 +1370,88 @@ fun ImmersivePosterNowPlayingLayout(
                     )
                 }
 
+                // Segmented White Icon Group: Start Rounding (Like), Small Inner Rounding (Download), End Rounding (More)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    IconButton(
+                    // 1. Like Button (Start Rounding + Small End Rounding, White Shape)
+                    Surface(
                         onClick = onToggleLike,
+                        shape = RoundedCornerShape(
+                            topStart = 20.dp,
+                            bottomStart = 20.dp,
+                            topEnd = 6.dp,
+                            bottomEnd = 6.dp
+                        ),
+                        color = Color.White,
+                        shadowElevation = 6.dp,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(width = 40.dp, height = 38.dp)
                             .scale(likeScale)
                             .testTag("now_playing_like_button")
                     ) {
-                        Icon(
-                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (isLiked) Color(0xFFFF4D6D) else Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                contentDescription = "Favorite",
+                                tint = if (isLiked) Color(0xFFE11D48) else Color(0xFF0F1115),
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
 
-                    IconButton(
-                        onClick = onMoreOptions,
+                    // 2. Download Button (Small Rounding, White Shape)
+                    Surface(
+                        onClick = onDownload,
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color.White,
+                        shadowElevation = 6.dp,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(width = 40.dp, height = 38.dp)
+                            .testTag("now_playing_download_button")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (isDownloading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = Color(0xFF0F1115),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (isDownloaded) AppIcons.DownloadForOffline else AppIcons.Download,
+                                    contentDescription = if (isDownloaded) "Downloaded" else "Download",
+                                    tint = if (isDownloaded) Color(0xFF059669) else Color(0xFF0F1115),
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. More Options Button (Small Start Rounding + End Rounding, White Shape)
+                    Surface(
+                        onClick = onMoreOptions,
+                        shape = RoundedCornerShape(
+                            topStart = 6.dp,
+                            bottomStart = 6.dp,
+                            topEnd = 20.dp,
+                            bottomEnd = 20.dp
+                        ),
+                        color = Color.White,
+                        shadowElevation = 6.dp,
+                        modifier = Modifier
+                            .size(width = 40.dp, height = 38.dp)
                             .testTag("now_playing_more_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreHoriz,
-                            contentDescription = "More Options",
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = "More Options",
+                                tint = Color(0xFF0F1115),
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -1452,7 +1518,7 @@ fun ImmersivePosterNowPlayingLayout(
                     }
                 }
 
-                // Time Row: Elapsed, Audio format badge (WEBM HD / AAC 320), Remaining Time
+                // Time Row: Elapsed & Remaining Time (AAC 320 badge removed)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1469,34 +1535,6 @@ fun ImmersivePosterNowPlayingLayout(
                         )
                     )
 
-                    // Audio Stream Badge
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.16f),
-                        modifier = Modifier.padding(horizontal = 6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.GraphicEq,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = if (track.streamUrl.contains("mp4") || track.streamUrl.contains("aac")) "AAC 320" else "WEBM HD",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = Color.White
-                                )
-                            )
-                        }
-                    }
-
                     val remainingMs = (totalDurationMs - displayPositionMs).coerceAtLeast(0L)
                     Text(
                         text = "-" + formatTime(remainingMs),
@@ -1509,69 +1547,92 @@ fun ImmersivePosterNowPlayingLayout(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Playback Controls Row: Prev, Big Rounded Play/Pause, Next
+            // Playback Controls Row: Segmented White Shapes (Start Rounding Prev, Small Inner Rounding Play/Pause, End Rounding Next)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
+                // Previous Track (Start Rounding + Small End Rounding, White Shape)
+                Surface(
                     onClick = onPrevious,
-                    modifier = Modifier.size(54.dp)
+                    shape = RoundedCornerShape(
+                        topStart = 28.dp,
+                        bottomStart = 28.dp,
+                        topEnd = 8.dp,
+                        bottomEnd = 8.dp
+                    ),
+                    color = Color.White,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
                 ) {
-                    Icon(
-                        imageVector = AppIcons.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = AppIcons.SkipPrevious,
+                            contentDescription = "Previous",
+                            tint = Color(0xFF0F1115),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
 
+                // Play / Pause (Small Rounding Center Pill, White Shape)
                 Surface(
                     onClick = onPlayPause,
-                    shape = RoundedCornerShape(26.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = Color.White,
                     shadowElevation = 12.dp,
-                    modifier = Modifier.size(76.dp)
+                    modifier = Modifier.size(width = 86.dp, height = 64.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (isBuffering) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(32.dp),
-                                color = Color.Black,
+                                modifier = Modifier.size(28.dp),
+                                color = Color(0xFF0F1115),
                                 strokeWidth = 3.dp
                             )
                         } else {
                             Icon(
-                                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                imageVector = if (isPlaying) Icons.Rounded.Pause else AppIcons.PlayArrow,
                                 contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = Color.Black,
-                                modifier = Modifier.size(40.dp)
+                                tint = Color(0xFF0F1115),
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }
                 }
 
-                IconButton(
+                // Next Track (Small Start Rounding + End Rounding, White Shape)
+                Surface(
                     onClick = onNext,
-                    modifier = Modifier.size(54.dp)
+                    shape = RoundedCornerShape(
+                        topStart = 8.dp,
+                        bottomStart = 8.dp,
+                        topEnd = 28.dp,
+                        bottomEnd = 28.dp
+                    ),
+                    color = Color.White,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
                 ) {
-                    Icon(
-                        imageVector = AppIcons.SkipNext,
-                        contentDescription = "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = AppIcons.SkipNext,
+                            contentDescription = "Next",
+                            tint = Color(0xFF0F1115),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
-            // Bottom Dock: Square FAB Style Queue & Lyrics + Real-time Connected Audio Output Device
+            // Bottom Dock: Segmented White Shapes (Start Rounding Queue, Small Inner Rounding Lyrics, End Rounding Audio Output Device)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1579,20 +1640,20 @@ fun ImmersivePosterNowPlayingLayout(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Queue Button - Square FAB Style
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Queue Button - Start Rounding + Small End Rounding, White Shape
                     Surface(
                         onClick = onOpenQueue,
-                        shape = RoundedCornerShape(14.dp),
-                        color = Color.White.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(
+                            topStart = 22.dp,
+                            bottomStart = 22.dp,
+                            topEnd = 6.dp,
+                            bottomEnd = 6.dp
+                        ),
+                        color = Color.White,
                         shadowElevation = 6.dp,
                         modifier = Modifier
-                            .size(48.dp)
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.22f),
-                                shape = RoundedCornerShape(14.dp)
-                            )
+                            .size(width = 46.dp, height = 42.dp)
                             .testTag("now_playing_queue_fab")
                     ) {
                         Box(
@@ -1602,25 +1663,20 @@ fun ImmersivePosterNowPlayingLayout(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                                 contentDescription = "Queue",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
+                                tint = Color(0xFF0F1115),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
 
-                    // Lyrics Button - Square FAB Style
+                    // Lyrics Button - Small Inner Rounding, White Shape
                     Surface(
                         onClick = onOpenLyrics,
-                        shape = RoundedCornerShape(14.dp),
-                        color = Color.White.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color.White,
                         shadowElevation = 6.dp,
                         modifier = Modifier
-                            .size(48.dp)
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.22f),
-                                shape = RoundedCornerShape(14.dp)
-                            )
+                            .size(width = 46.dp, height = 42.dp)
                             .testTag("now_playing_lyrics_fab")
                     ) {
                         Box(
@@ -1630,39 +1686,30 @@ fun ImmersivePosterNowPlayingLayout(
                             Icon(
                                 imageVector = Icons.Default.Lyrics,
                                 contentDescription = "Lyrics",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
+                                tint = Color(0xFF0F1115),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
-                // Real-time Audio Output Device Square FAB Pill
-                // Automatically displays connected Bluetooth speaker/headphones/USB name in real-time or "Speaker"
+                // Real-time Audio Output Device Pill - Small Start Rounding + End Rounding, White Shape
                 Surface(
                     onClick = onOpenDeviceSelector,
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (activeAudioDevice.isExternalConnected) {
-                        dynamicColors.primary.copy(alpha = 0.28f)
-                    } else {
-                        Color.White.copy(alpha = 0.18f)
-                    },
+                    shape = RoundedCornerShape(
+                        topStart = 6.dp,
+                        bottomStart = 6.dp,
+                        topEnd = 22.dp,
+                        bottomEnd = 22.dp
+                    ),
+                    color = Color.White,
                     shadowElevation = 6.dp,
                     modifier = Modifier
-                        .height(48.dp)
-                        .border(
-                            width = 1.dp,
-                            color = if (activeAudioDevice.isExternalConnected) {
-                                dynamicColors.primary.copy(alpha = 0.55f)
-                            } else {
-                                Color.White.copy(alpha = 0.22f)
-                            },
-                            shape = RoundedCornerShape(14.dp)
-                        )
+                        .height(42.dp)
                         .testTag("now_playing_speaker_device_fab")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (activeAudioDevice.isExternalConnected) {
@@ -1670,23 +1717,23 @@ fun ImmersivePosterNowPlayingLayout(
                                 modifier = Modifier
                                     .size(7.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF34D399))
+                                    .background(Color(0xFF059669))
                             )
-                            Spacer(modifier = Modifier.width(7.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
                         Icon(
                             imageVector = activeAudioDevice.icon,
                             contentDescription = activeAudioDevice.name,
-                            tint = Color.White,
-                            modifier = Modifier.size(19.dp)
+                            tint = Color(0xFF0F1115),
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(7.dp))
                         Text(
                             text = activeAudioDevice.name,
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 13.5.sp
+                                color = Color(0xFF0F1115),
+                                fontSize = 13.sp
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -2313,7 +2360,7 @@ fun SongOptionsBottomSheet(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                            imageVector = AppIcons.AddCircle,
                             contentDescription = "Add to Playlist",
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
@@ -2332,17 +2379,21 @@ fun SongOptionsBottomSheet(
                 }
             }
 
-            // Clean Option Items List (Like, Download, Add to Playlist removed from line below)
+            // Closely-grouped M3 Asymmetrical Inner-Corner Vertical Option Items List
+            val hasAlbumItem = track.albumId.isNotBlank()
+            val totalSheetOptions = if (hasAlbumItem) 9 else 8
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 OptionItem(
                     icon = Icons.Outlined.Equalizer,
                     title = "Equalizer",
                     tint = MaterialTheme.colorScheme.primary,
+                    shape = m3SheetVerticalItemShape(index = 0, count = totalSheetOptions),
                     onClick = onOpenEqualizer
                 )
 
@@ -2350,18 +2401,21 @@ fun SongOptionsBottomSheet(
                     icon = Icons.Outlined.Radio,
                     title = "Start Song Radio",
                     tint = MaterialTheme.colorScheme.primary,
+                    shape = m3SheetVerticalItemShape(index = 1, count = totalSheetOptions),
                     onClick = onStartRadio
                 )
 
                 OptionItem(
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     title = "Up Next (Queue)",
+                    shape = m3SheetVerticalItemShape(index = 2, count = totalSheetOptions),
                     onClick = onShowQueue
                 )
 
                 OptionItem(
                     icon = Icons.Default.Lyrics,
                     title = "View Lyrics",
+                    shape = m3SheetVerticalItemShape(index = 3, count = totalSheetOptions),
                     onClick = onShowLyrics
                 )
 
@@ -2369,6 +2423,7 @@ fun SongOptionsBottomSheet(
                     icon = Icons.Rounded.Shuffle,
                     title = if (isShuffle) "Shuffle: ON" else "Shuffle: OFF",
                     tint = if (isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    shape = m3SheetVerticalItemShape(index = 4, count = totalSheetOptions),
                     onClick = onToggleShuffle
                 )
 
@@ -2381,13 +2436,16 @@ fun SongOptionsBottomSheet(
                     icon = if (repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
                     title = repeatTitle,
                     tint = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    shape = m3SheetVerticalItemShape(index = 5, count = totalSheetOptions),
                     onClick = onToggleRepeat
                 )
 
-                if (track.albumId.isNotBlank()) {
+                var nextIdx = 6
+                if (hasAlbumItem) {
                     OptionItem(
                         icon = Icons.Outlined.Album,
                         title = "View Album",
+                        shape = m3SheetVerticalItemShape(index = nextIdx++, count = totalSheetOptions),
                         onClick = onViewAlbum
                     )
                 }
@@ -2395,16 +2453,37 @@ fun SongOptionsBottomSheet(
                 OptionItem(
                     icon = Icons.Outlined.Info,
                     title = "View Song Credits",
+                    shape = m3SheetVerticalItemShape(index = nextIdx++, count = totalSheetOptions),
                     onClick = onShowCredits
                 )
 
                 OptionItem(
                     icon = Icons.AutoMirrored.Rounded.Send,
                     title = "Share",
+                    shape = m3SheetVerticalItemShape(index = nextIdx, count = totalSheetOptions),
                     onClick = onShare
                 )
             }
         }
+    }
+}
+
+private fun m3SheetVerticalItemShape(index: Int, count: Int): RoundedCornerShape {
+    return when {
+        count <= 1 -> RoundedCornerShape(24.dp)
+        index == 0 -> RoundedCornerShape(
+            topStart = 24.dp,
+            topEnd = 24.dp,
+            bottomStart = 6.dp,
+            bottomEnd = 6.dp
+        )
+        index == count - 1 -> RoundedCornerShape(
+            topStart = 6.dp,
+            topEnd = 6.dp,
+            bottomStart = 24.dp,
+            bottomEnd = 24.dp
+        )
+        else -> RoundedCornerShape(6.dp)
     }
 }
 
@@ -2459,25 +2538,30 @@ private fun OptionItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     tint: Color = MaterialTheme.colorScheme.onSurface,
+    shape: RoundedCornerShape = RoundedCornerShape(6.dp),
     onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = Color.Transparent,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+        ),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp, horizontal = 8.dp),
+                .padding(vertical = 10.dp, horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -2597,7 +2681,7 @@ fun AddToPlaylistDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
+                                imageVector = AppIcons.AddCircle,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(20.dp)
@@ -3027,7 +3111,7 @@ fun QueueBottomSheet(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onLoadMoreRecommendations) {
                             Icon(
-                                imageVector = Icons.Default.Add,
+                                imageVector = AppIcons.AddCircle,
                                 contentDescription = "Load Recommendations",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(22.dp)

@@ -163,7 +163,7 @@ fun LibraryScreen(
             title = "Downloads",
             subtitle = if (downloadedSongs.isEmpty()) "Offline music" else "${downloadedSongs.size} saved",
             count = downloadedSongs.size,
-            icon = com.example.ui.theme.AppIcons.DownloadForOffline,
+            icon = com.example.ui.theme.AppIcons.Download,
             startGradient = Color(0xFF0284C7), // Pixel Sky Blue
             endGradient = Color(0xFF0369A1)
         ),
@@ -201,98 +201,45 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(Color.Transparent)
                     .statusBarsPadding()
                     .padding(top = 10.dp, bottom = 4.dp)
             ) {
-                // Top Header Row
+                // Top Header Row (Top-right icons removed per user request)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (!showOverviewGrid) {
-                            IconButton(
-                                onClick = { showOverviewGrid = true },
-                                modifier = Modifier
-                                    .padding(end = 4.dp)
-                                    .size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back to Library Grid"
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = if (showOverviewGrid) "Your Library" else when (selectedTab) {
-                                LibraryTab.LIKED -> "Liked Songs"
-                                LibraryTab.DOWNLOADS -> "Downloads"
-                                LibraryTab.PLAYLISTS -> "Playlists"
-                                LibraryTab.RECENT -> "History"
-                                LibraryTab.LOCAL -> "Local Files"
-                            },
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 22.sp
-                            )
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Quick switch to Grid toggle
-                        if (!showOverviewGrid) {
-                            IconButton(
-                                onClick = { showOverviewGrid = true },
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.GridView,
-                                    contentDescription = "Grid View",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        // Import Playlist button (JioSaavn SVG Icon)
+                    if (!showOverviewGrid) {
                         IconButton(
-                            onClick = { showImportPlaylistSheet = true },
+                            onClick = { showOverviewGrid = true },
                             modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .testTag("import_playlist_button")
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_jiosaavn),
-                                contentDescription = "Import Playlist",
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        // Create playlist button
-                        IconButton(
-                            onClick = { showCreatePlaylistDialog = true },
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .testTag("create_playlist_button")
+                                .padding(end = 4.dp)
+                                .size(36.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Create Playlist",
-                                modifier = Modifier.size(20.dp)
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to Library Grid"
                             )
                         }
                     }
+
+                    Text(
+                        text = if (showOverviewGrid) "Your Library" else when (selectedTab) {
+                            LibraryTab.LIKED -> "Liked Songs"
+                            LibraryTab.DOWNLOADS -> "Downloads"
+                            LibraryTab.PLAYLISTS -> "Playlists"
+                            LibraryTab.RECENT -> "History"
+                            LibraryTab.LOCAL -> "Local Files"
+                        },
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 22.sp
+                        )
+                    )
                 }
 
                 // If inside category list, clean top without redundant filter chips
@@ -301,7 +248,7 @@ fun LibraryScreen(
                 Spacer(modifier = Modifier.height(4.dp))
             }
         },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         modifier = modifier
     ) { innerPadding ->
         Box(
@@ -318,14 +265,17 @@ fun LibraryScreen(
                 label = "library_content_anim"
             ) { isGridOverview ->
                 if (isGridOverview) {
+                    val dynamicColor = MaterialTheme.colorScheme.primary
+                    val dynamicContainerColor = dynamicColor.copy(alpha = 0.16f)
+
                     val overviewCards = listOf(
                         LibraryOverviewCardData(
                             id = "import_playlist",
                             title = "Import Playlist",
-                            subtitle = "Paste playlist link",
-                            iconDrawableRes = R.drawable.ic_jiosaavn,
-                            iconColor = Color(0xFF00D285),
-                            containerColor = Color(0xFF00D285).copy(alpha = 0.16f),
+                            subtitle = "Paste link",
+                            icon = Icons.Rounded.CloudDownload,
+                            iconColor = dynamicColor,
+                            containerColor = dynamicContainerColor,
                             onClick = { showImportPlaylistSheet = true }
                         ),
                         LibraryOverviewCardData(
@@ -346,9 +296,9 @@ fun LibraryScreen(
                             title = "Downloads",
                             subtitle = if (downloadedSongs.isEmpty()) "Offline tracks" else "${downloadedSongs.size} saved",
                             count = downloadedSongs.size,
-                            icon = Icons.Rounded.Download,
-                            iconColor = Color(0xFF0284C7),
-                            containerColor = Color(0xFF0284C7).copy(alpha = 0.16f),
+                            icon = com.example.ui.theme.AppIcons.Download,
+                            iconColor = dynamicColor,
+                            containerColor = dynamicContainerColor,
                             onClick = {
                                 viewModel.setTab(LibraryTab.DOWNLOADS)
                                 showOverviewGrid = false
@@ -360,8 +310,8 @@ fun LibraryScreen(
                             subtitle = if (playlists.isEmpty()) "Custom mixes" else "${playlists.size} playlists",
                             count = playlists.size,
                             icon = Icons.AutoMirrored.Filled.QueueMusic,
-                            iconColor = Color(0xFF8B5CF6),
-                            containerColor = Color(0xFF8B5CF6).copy(alpha = 0.16f),
+                            iconColor = dynamicColor,
+                            containerColor = dynamicContainerColor,
                             onClick = {
                                 viewModel.setTab(LibraryTab.PLAYLISTS)
                                 showOverviewGrid = false
@@ -373,8 +323,8 @@ fun LibraryScreen(
                             subtitle = if (recentlyPlayed.isEmpty()) "Recent listens" else "${recentlyPlayed.size} played",
                             count = recentlyPlayed.size,
                             icon = Icons.Filled.History,
-                            iconColor = Color(0xFFF59E0B),
-                            containerColor = Color(0xFFF59E0B).copy(alpha = 0.16f),
+                            iconColor = dynamicColor,
+                            containerColor = dynamicContainerColor,
                             onClick = {
                                 viewModel.setTab(LibraryTab.RECENT)
                                 showOverviewGrid = false
@@ -386,8 +336,8 @@ fun LibraryScreen(
                             subtitle = if (localSongs.isEmpty()) "Device storage" else "${localSongs.size} songs",
                             count = localSongs.size,
                             icon = Icons.Filled.FolderOpen,
-                            iconColor = Color(0xFF6366F1),
-                            containerColor = Color(0xFF6366F1).copy(alpha = 0.16f),
+                            iconColor = dynamicColor,
+                            containerColor = dynamicContainerColor,
                             onClick = {
                                 viewModel.setTab(LibraryTab.LOCAL)
                                 showOverviewGrid = false
@@ -398,31 +348,48 @@ fun LibraryScreen(
                         )
                     )
 
-                    val cardRows = remember(overviewCards) { overviewCards.chunked(2) }
+                    val cardRows = remember(overviewCards) { overviewCards.chunked(3) }
 
-                    // Material 3 Expressive 2x2 Horizontal Layout (2 columns per row)
+                    // Material 3 Expressive 3-Column Segmented Layout (Start rounding -> Small inner rounding -> End rounding)
                     LazyColumn(
                         contentPadding = PaddingValues(
                             start = 16.dp,
                             end = 16.dp,
                             top = 8.dp,
-                            bottom = 165.dp
+                            bottom = 175.dp
                         ),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(cardRows, key = { it.joinToString { item -> item.id } }) { rowItems ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                for (item in rowItems) {
+                                rowItems.forEachIndexed { index, item ->
+                                    val cardShape = when {
+                                        rowItems.size == 1 -> RoundedCornerShape(24.dp)
+                                        index == 0 -> RoundedCornerShape(
+                                            topStart = 24.dp,
+                                            bottomStart = 24.dp,
+                                            topEnd = 6.dp,
+                                            bottomEnd = 6.dp
+                                        )
+                                        index == rowItems.lastIndex -> RoundedCornerShape(
+                                            topStart = 6.dp,
+                                            bottomStart = 6.dp,
+                                            topEnd = 24.dp,
+                                            bottomEnd = 24.dp
+                                        )
+                                        else -> RoundedCornerShape(6.dp)
+                                    }
                                     LibraryGrid2x2Card(
                                         item = item,
+                                        cardShape = cardShape,
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
-                                if (rowItems.size == 1) {
+                                repeat(3 - rowItems.size) {
                                     Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
@@ -608,7 +575,7 @@ fun LibraryScreen(
                                                 shape = RoundedCornerShape(20.dp)
                                             ) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Add,
+                                                    imageVector = com.example.ui.theme.AppIcons.AddCircle,
                                                     contentDescription = null,
                                                     modifier = Modifier.size(18.dp)
                                                 )
@@ -650,6 +617,29 @@ fun LibraryScreen(
                         }
                     }
                 }
+            }
+
+            // Square FAB with + Icon for Create Playlist
+            FloatingActionButton(
+                onClick = { showCreatePlaylistDialog = true },
+                shape = RoundedCornerShape(18.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 20.dp,
+                        bottom = if (currentTrack != null) 168.dp else 104.dp
+                    )
+                    .size(56.dp)
+                    .testTag("create_playlist_square_fab")
+            ) {
+                Icon(
+                    imageVector = com.example.ui.theme.AppIcons.AddCircle,
+                    contentDescription = "Create Playlist",
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
     }
@@ -808,7 +798,7 @@ fun PlaylistGridCard(
                         DropdownMenuItem(
                             text = { Text("Open Playlist") },
                             leadingIcon = {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                Icon(com.example.ui.theme.AppIcons.PlayArrow, contentDescription = null)
                             },
                             onClick = {
                                 showMenu = false
@@ -839,14 +829,12 @@ fun PlaylistGridCard(
 @Composable
 fun LibraryGrid2x2Card(
     item: LibraryOverviewCardData,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardShape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(20.dp)
 ) {
-    // M3 Expressive Card Shape: Smooth 20.dp rounded corners with tonal depth
-    val expressiveCardShape = RoundedCornerShape(20.dp)
-
     Surface(
         onClick = item.onClick,
-        shape = expressiveCardShape,
+        shape = cardShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -865,16 +853,16 @@ fun LibraryGrid2x2Card(
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 8.dp, end = 9.dp)
+                        .padding(top = 6.dp, end = 6.dp)
                 ) {
                     Text(
                         text = "${item.count}",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                     )
                 }
             }
@@ -883,7 +871,7 @@ fun LibraryGrid2x2Card(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -898,24 +886,23 @@ fun LibraryGrid2x2Card(
                         1.dp,
                         iconColor.copy(alpha = 0.25f)
                     ),
-                    modifier = Modifier.size(42.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        if (item.iconDrawableRes != null || item.id == "import_playlist") {
-                            val res = item.iconDrawableRes ?: R.drawable.ic_jiosaavn
-                            Image(
-                                painter = painterResource(id = res),
-                                contentDescription = item.title,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        } else if (item.icon != null) {
+                        if (item.icon != null) {
                             Icon(
                                 imageVector = item.icon,
                                 contentDescription = item.title,
                                 tint = iconColor,
+                                modifier = Modifier.size(21.dp)
+                            )
+                        } else if (item.iconDrawableRes != null) {
+                            Image(
+                                painter = painterResource(id = item.iconDrawableRes),
+                                contentDescription = item.title,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -928,7 +915,7 @@ fun LibraryGrid2x2Card(
                     text = item.title,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.5.sp
+                        fontSize = 12.5.sp
                     ),
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -942,7 +929,7 @@ fun LibraryGrid2x2Card(
                     text = item.subtitle,
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp
+                        fontSize = 10.5.sp
                     ),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     maxLines = 1,
@@ -1123,7 +1110,7 @@ fun TrackListSection(
                             .weight(1f)
                             .height(42.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(imageVector = com.example.ui.theme.AppIcons.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Play All", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
@@ -1318,7 +1305,7 @@ fun DownloadsSection(
                                     .weight(1f)
                                     .height(42.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(imageVector = com.example.ui.theme.AppIcons.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Play All", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }

@@ -72,55 +72,59 @@ fun Modifier.hazeBlur(
             }
 
             if (sources.isNotEmpty() && size.width > 0f && size.height > 0f) {
-                val blurRadiusPx = style.blurRadius.toPx().coerceAtLeast(1f)
-                val padPx = blurRadiusPx.roundToInt().coerceIn(8, 120)
-                val recordWidth = (size.width.roundToInt() + padPx * 2).coerceAtLeast(1)
-                val recordHeight = (size.height.roundToInt() + padPx * 2).coerceAtLeast(1)
+                try {
+                    val blurRadiusPx = style.blurRadius.toPx().coerceAtLeast(1f)
+                    val padPx = blurRadiusPx.roundToInt().coerceIn(8, 120)
+                    val recordWidth = (size.width.roundToInt() + padPx * 2).coerceAtLeast(1)
+                    val recordHeight = (size.height.roundToInt() + padPx * 2).coerceAtLeast(1)
 
-                blurLayer.clip = true
-                blurLayer.renderEffect = BlurEffect(
-                    radiusX = blurRadiusPx,
-                    radiusY = blurRadiusPx,
-                    edgeTreatment = TileMode.Clamp
-                )
+                    blurLayer.clip = true
+                    blurLayer.renderEffect = BlurEffect(
+                        radiusX = blurRadiusPx,
+                        radiusY = blurRadiusPx,
+                        edgeTreatment = TileMode.Clamp
+                    )
 
-                var hasValidSource = false
-                blurLayer.record(size = IntSize(recordWidth, recordHeight)) {
-                    for (sourceState in sources) {
-                        // Subscribe to source redraws so scrolling/animations update the blur at 60/120fps
-                        val tick = sourceState.drawTick
-                        val srcLayer = sourceState.graphicsLayer
-                        if (srcLayer != null && tick >= 0L) {
-                            hasValidSource = true
-                            val dx = sourceState.positionInRoot.x - targetPositionInRoot.x + padPx
-                            val dy = sourceState.positionInRoot.y - targetPositionInRoot.y + padPx
-                            translate(left = dx, top = dy) {
-                                drawLayer(srcLayer)
+                    var hasValidSource = false
+                    blurLayer.record(size = IntSize(recordWidth, recordHeight)) {
+                        for (sourceState in sources) {
+                            // Subscribe to source redraws so scrolling/animations update the blur at 60/120fps
+                            val tick = sourceState.drawTick
+                            val srcLayer = sourceState.graphicsLayer
+                            if (srcLayer != null && tick >= 0L) {
+                                hasValidSource = true
+                                val dx = sourceState.positionInRoot.x - targetPositionInRoot.x + padPx
+                                val dy = sourceState.positionInRoot.y - targetPositionInRoot.y + padPx
+                                translate(left = dx, top = dy) {
+                                    drawLayer(srcLayer)
+                                }
                             }
                         }
                     }
-                }
 
-                if (hasValidSource) {
-                    val resolvedCornerPx = if (style.cornerRadius != Dp.Unspecified) {
-                        style.cornerRadius.toPx()
-                    } else {
-                        minOf(size.width, size.height) / 2f
-                    }
+                    if (hasValidSource) {
+                        val resolvedCornerPx = if (style.cornerRadius != Dp.Unspecified) {
+                            style.cornerRadius.toPx()
+                        } else {
+                            minOf(size.width, size.height) / 2f
+                        }
 
-                    clipRoundedPath.reset()
-                    clipRoundedPath.addRoundRect(
-                        RoundRect(
-                            rect = Rect(0f, 0f, size.width, size.height),
-                            cornerRadius = CornerRadius(resolvedCornerPx, resolvedCornerPx)
+                        clipRoundedPath.reset()
+                        clipRoundedPath.addRoundRect(
+                            RoundRect(
+                                rect = Rect(0f, 0f, size.width, size.height),
+                                cornerRadius = CornerRadius(resolvedCornerPx, resolvedCornerPx)
+                            )
                         )
-                    )
 
-                    clipPath(clipRoundedPath) {
-                        translate(left = -padPx.toFloat(), top = -padPx.toFloat()) {
-                            drawLayer(blurLayer)
+                        clipPath(clipRoundedPath) {
+                            translate(left = -padPx.toFloat(), top = -padPx.toFloat()) {
+                                drawLayer(blurLayer)
+                            }
                         }
                     }
+                } catch (e: Throwable) {
+                    // Fail gracefully without crashing
                 }
             }
 

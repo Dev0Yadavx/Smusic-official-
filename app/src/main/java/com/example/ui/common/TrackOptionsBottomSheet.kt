@@ -1,9 +1,11 @@
 package com.example.ui.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -281,7 +283,7 @@ fun TrackOptionsBottomSheet(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.BookmarkAdd,
+                            imageVector = AppIcons.AddCircle,
                             contentDescription = "Add to Playlist",
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
@@ -300,44 +302,80 @@ fun TrackOptionsBottomSheet(
                 }
             }
 
-            OptionItem(
-                icon = Icons.Default.PlayArrow,
-                title = "Play Now",
-                onClick = {
-                    onPlayNow()
-                    onDismiss()
-                }
-            )
+            Spacer(modifier = Modifier.height(6.dp))
 
-            OptionItem(
-                icon = Icons.Outlined.QueuePlayNext,
-                title = "Play Next",
-                onClick = {
-                    onPlayNext()
-                    onDismiss()
-                }
-            )
+            // Closely-grouped M3 Asymmetrical Inner-Corner Vertical Option List
+            val hasAlbumAction = track.albumId.isNotBlank() && onViewAlbum != null
+            val totalOptions = if (hasAlbumAction) 4 else 3
 
-            OptionItem(
-                icon = Icons.Outlined.PlaylistAdd,
-                title = "Add to Queue",
-                onClick = {
-                    onAddToQueue()
-                    onDismiss()
-                }
-            )
-
-            if (track.albumId.isNotBlank() && onViewAlbum != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 OptionItem(
-                    icon = Icons.Outlined.Album,
-                    title = "View Album (${track.album})",
+                    icon = AppIcons.PlayArrow,
+                    title = "Play Now",
+                    shape = m3VerticalGroupItemShape(index = 0, count = totalOptions),
                     onClick = {
-                        onViewAlbum()
+                        onPlayNow()
                         onDismiss()
                     }
                 )
+
+                OptionItem(
+                    icon = Icons.Outlined.QueuePlayNext,
+                    title = "Play Next",
+                    shape = m3VerticalGroupItemShape(index = 1, count = totalOptions),
+                    onClick = {
+                        onPlayNext()
+                        onDismiss()
+                    }
+                )
+
+                OptionItem(
+                    icon = Icons.Outlined.PlaylistAdd,
+                    title = "Add to Queue",
+                    shape = m3VerticalGroupItemShape(index = 2, count = totalOptions),
+                    onClick = {
+                        onAddToQueue()
+                        onDismiss()
+                    }
+                )
+
+                if (hasAlbumAction) {
+                    OptionItem(
+                        icon = Icons.Outlined.Album,
+                        title = "View Album (${track.album})",
+                        shape = m3VerticalGroupItemShape(index = 3, count = totalOptions),
+                        onClick = {
+                            onViewAlbum?.invoke()
+                            onDismiss()
+                        }
+                    )
+                }
             }
         }
+    }
+}
+
+private fun m3VerticalGroupItemShape(index: Int, count: Int): RoundedCornerShape {
+    return when {
+        count <= 1 -> RoundedCornerShape(24.dp)
+        index == 0 -> RoundedCornerShape(
+            topStart = 24.dp,
+            topEnd = 24.dp,
+            bottomStart = 6.dp,
+            bottomEnd = 6.dp
+        )
+        index == count - 1 -> RoundedCornerShape(
+            topStart = 6.dp,
+            topEnd = 6.dp,
+            bottomStart = 24.dp,
+            bottomEnd = 24.dp
+        )
+        else -> RoundedCornerShape(6.dp)
     }
 }
 
@@ -345,27 +383,56 @@ fun TrackOptionsBottomSheet(
 private fun OptionItem(
     icon: ImageVector,
     title: String,
+    shape: RoundedCornerShape,
     iconTint: androidx.compose.ui.graphics.Color? = null,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val resolvedTint = iconTint ?: MaterialTheme.colorScheme.onSurface
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = iconTint ?: MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(18.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = resolvedTint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = resolvedTint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(14.dp)
+            )
+        }
     }
 }

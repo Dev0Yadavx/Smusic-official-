@@ -12,20 +12,20 @@ import androidx.compose.ui.unit.dp
 object AppIcons {
 
     /**
-     * Material Symbols Outlined 24dp - Download
-     * https://fonts.gstatic.com/render/v1/Material+Symbols+Outlined/24dp/download.kt?var=opsz,wght,FILL,GRAD,ROND@24,400,0,0,50
+     * Material Symbols Outlined 40dp - Play Arrow
+     * https://fonts.gstatic.com/render/v1/Material+Symbols+Outlined/40dp/play_arrow.kt?var=opsz,wght,FILL,GRAD,ROND@40,400,0,0,50
      */
-    val Download: ImageVector
+    val PlayArrow: ImageVector
         get() {
-            if (_download != null) {
-                return _download!!
+            if (_playArrow != null) {
+                return _playArrow!!
             }
-            _download = ImageVector.Builder(
-                name = "download",
-                defaultWidth = 24.dp,
-                defaultHeight = 24.dp,
-                viewportWidth = 24f,
-                viewportHeight = 24f
+            _playArrow = ImageVector.Builder(
+                name = "play_arrow",
+                defaultWidth = 40.dp,
+                defaultHeight = 40.dp,
+                viewportWidth = 40f,
+                viewportHeight = 40f
             ).apply {
                 path(
                     fill = SolidColor(Color.Black),
@@ -38,30 +38,170 @@ object AppIcons {
                     strokeLineMiter = 1f,
                     pathFillType = PathFillType.Companion.NonZero
                 ) {
-                    moveTo(12f, 16f)
-                    lineTo(7f, 11f)
-                    lineTo(8.4f, 9.55f)
-                    lineToRelative(2.6f, 2.6f)
-                    verticalLineTo(4f)
-                    horizontalLineToRelative(2f)
-                    verticalLineToRelative(8.15f)
-                    lineToRelative(2.6f, -2.6f)
-                    lineTo(17f, 11f)
-                    lineToRelative(-5f, 5f)
+                    moveTo(13.33f, 29.83f)
+                    verticalLineTo(10.17f)
+                    quadToRelative(0f, -0.78f, 0.72f, -1.2f)
+                    quadToRelative(0.72f, -0.41f, 1.45f, 0.05f)
+                    lineToRelative(15.46f, 9.83f)
+                    quadToRelative(0.65f, 0.42f, 0.65f, 1.15f)
+                    reflectiveQuadToRelative(-0.65f, 1.15f)
+                    lineTo(15.5f, 30.98f)
+                    quadToRelative(-0.73f, 0.46f, -1.45f, 0.05f)
+                    quadToRelative(-0.72f, -0.42f, -0.72f, -1.2f)
                     close()
-                    moveTo(6f, 20f)
-                    quadTo(5.18f, 20f, 4.59f, 19.41f)
-                    reflectiveQuadTo(4f, 18f)
-                    verticalLineTo(15f)
-                    horizontalLineTo(6f)
-                    verticalLineToRelative(3f)
-                    horizontalLineTo(18f)
-                    verticalLineTo(15f)
-                    horizontalLineToRelative(2f)
-                    verticalLineToRelative(3f)
-                    quadToRelative(0f, 0.82f, -0.59f, 1.41f)
-                    reflectiveQuadTo(18f, 20f)
-                    horizontalLineTo(6f)
+                    moveTo(16.11f, 20f)
+                    close()
+                    moveTo(16.11f, 26.58f)
+                    lineTo(26.46f, 20f)
+                    lineTo(16.11f, 13.42f)
+                    verticalLineToRelative(13.16f)
+                    close()
+                }
+            }.build()
+            return _playArrow!!
+        }
+    private var _playArrow: ImageVector? = null
+
+    /**
+     * Material Symbols Outlined 40dp - Add Circle
+     * https://fonts.gstatic.com/render/v1/Material+Symbols+Outlined/40dp/add_circle.kt?var=opsz,wght,FILL,GRAD,ROND@40,400,0,0,50
+     */
+    val AddCircle: ImageVector
+        get() {
+            if (_addCircle != null) {
+                return _addCircle!!
+            }
+            _addCircle = ImageVector.Builder(
+                name = "add_circle",
+                defaultWidth = 40.dp,
+                defaultHeight = 40.dp,
+                viewportWidth = 40f,
+                viewportHeight = 40f
+            ).apply {
+                path(
+                    fill = SolidColor(Color.Black),
+                    fillAlpha = 1f,
+                    stroke = null,
+                    strokeAlpha = 1f,
+                    strokeLineWidth = 1f,
+                    strokeLineCap = StrokeCap.Butt,
+                    strokeLineJoin = StrokeJoin.Bevel,
+                    strokeLineMiter = 1f,
+                    pathFillType = PathFillType.Companion.NonZero
+                ) {
+                    moveTo(18.61f, 26.94f)
+                    quadToRelative(0f, 0.58f, 0.4f, 0.99f)
+                    reflectiveQuadToRelative(0.99f, 0.4f)
+                    quadToRelative(0.58f, 0f, 0.99f, -0.4f)
+                    reflectiveQuadToRelative(0.4f, -0.99f)
+                    verticalLineToRelative(-5.55f)
+                    horizontalLineToRelative(5.55f)
+                    quadToRelative(0.58f, 0f, 0.99f, -0.4f)
+                    reflectiveQuadToRelative(0.4f, -0.99f)
+                    quadToRelative(0f, -0.58f, -0.4f, -0.99f)
+                    reflectiveQuadToRelative(-0.99f, -0.4f)
+                    horizontalLineToRelative(-5.55f)
+                    verticalLineToRelative(-5.55f)
+                    quadToRelative(0f, -0.58f, -0.4f, -0.99f)
+                    reflectiveQuadToRelative(-0.99f, -0.4f)
+                    quadToRelative(-0.58f, 0f, -0.99f, 0.4f)
+                    reflectiveQuadToRelative(-0.4f, 0.99f)
+                    verticalLineToRelative(5.55f)
+                    horizontalLineToRelative(-5.55f)
+                    quadToRelative(-0.58f, 0f, -0.99f, 0.4f)
+                    reflectiveQuadToRelative(-0.4f, 0.99f)
+                    quadToRelative(0f, 0.58f, 0.4f, 0.99f)
+                    reflectiveQuadToRelative(0.99f, 0.4f)
+                    horizontalLineToRelative(5.55f)
+                    verticalLineToRelative(5.55f)
+                    close()
+                    moveTo(20f, 36.67f)
+                    quadToRelative(-3.46f, 0f, -6.5f, -1.31f)
+                    reflectiveQuadToRelative(-5.29f, -3.56f)
+                    reflectiveQuadToRelative(-3.56f, -5.29f)
+                    reflectiveQuadTo(3.33f, 20f)
+                    quadToRelative(0f, -3.46f, 1.31f, -6.5f)
+                    reflectiveQuadToRelative(3.56f, -5.29f)
+                    reflectiveQuadToRelative(5.29f, -3.56f)
+                    reflectiveQuadTo(20f, 3.33f)
+                    quadToRelative(3.46f, 0f, 6.5f, 1.31f)
+                    reflectiveQuadToRelative(5.29f, 3.56f)
+                    reflectiveQuadToRelative(3.56f, 5.29f)
+                    reflectiveQuadTo(36.67f, 20f)
+                    quadToRelative(0f, 3.46f, -1.31f, 6.5f)
+                    reflectiveQuadToRelative(-3.56f, 5.29f)
+                    reflectiveQuadToRelative(-5.29f, 3.56f)
+                    reflectiveQuadTo(20f, 36.67f)
+                    close()
+                    moveTo(20f, 33.89f)
+                    quadToRelative(5.79f, 0f, 9.84f, -4.05f)
+                    reflectiveQuadTo(33.89f, 20f)
+                    reflectiveQuadToRelative(-4.05f, -9.84f)
+                    reflectiveQuadTo(20f, 6.11f)
+                    reflectiveQuadToRelative(-9.84f, 4.05f)
+                    reflectiveQuadTo(6.11f, 20f)
+                    reflectiveQuadToRelative(4.05f, 9.84f)
+                    reflectiveQuadTo(20f, 33.89f)
+                    close()
+                    moveTo(20f, 20f)
+                    close()
+                }
+            }.build()
+            return _addCircle!!
+        }
+    private var _addCircle: ImageVector? = null
+
+    /**
+     * Material Symbols Outlined 40dp - Download
+     * https://fonts.gstatic.com/render/v1/Material+Symbols+Outlined/40dp/download.kt?var=opsz,wght,FILL,GRAD,ROND@40,400,0,0,50
+     */
+    val Download: ImageVector
+        get() {
+            if (_download != null) {
+                return _download!!
+            }
+            _download = ImageVector.Builder(
+                name = "download",
+                defaultWidth = 40.dp,
+                defaultHeight = 40.dp,
+                viewportWidth = 40f,
+                viewportHeight = 40f
+            ).apply {
+                path(
+                    fill = SolidColor(Color.Black),
+                    fillAlpha = 1f,
+                    stroke = null,
+                    strokeAlpha = 1f,
+                    strokeLineWidth = 1f,
+                    strokeLineCap = StrokeCap.Butt,
+                    strokeLineJoin = StrokeJoin.Bevel,
+                    strokeLineMiter = 1f,
+                    pathFillType = PathFillType.Companion.NonZero
+                ) {
+                    moveTo(20f, 26.54f)
+                    lineToRelative(-8.06f, -8.06f)
+                    lineToRelative(1.98f, -1.98f)
+                    lineToRelative(4.69f, 4.69f)
+                    verticalLineTo(6.67f)
+                    horizontalLineToRelative(2.78f)
+                    verticalLineToRelative(14.52f)
+                    lineToRelative(4.69f, -4.69f)
+                    lineToRelative(1.98f, 1.98f)
+                    lineTo(20f, 26.54f)
+                    close()
+                    moveTo(9.44f, 33.33f)
+                    quadToRelative(-1.14f, 0f, -1.96f, -0.82f)
+                    reflectiveQuadToRelative(-0.81f, -1.96f)
+                    verticalLineToRelative(-5.33f)
+                    horizontalLineToRelative(2.77f)
+                    verticalLineToRelative(5.33f)
+                    horizontalLineToRelative(21.12f)
+                    verticalLineToRelative(-5.33f)
+                    horizontalLineToRelative(2.77f)
+                    verticalLineToRelative(5.33f)
+                    quadToRelative(0f, 1.14f, -0.81f, 1.96f)
+                    reflectiveQuadToRelative(-1.96f, 0.82f)
+                    horizontalLineTo(9.44f)
                     close()
                 }
             }.build()

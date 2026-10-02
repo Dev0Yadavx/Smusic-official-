@@ -62,11 +62,14 @@ fun HomeScreen(
     val userAvatarEmoji by themeManager.userAvatarEmoji.collectAsStateWithLifecycle()
     val userAvatarImageUri by themeManager.userAvatarImageUri.collectAsStateWithLifecycle()
     val isLiquidGlassEnabled by themeManager.isLiquidGlassEnabled.collectAsStateWithLifecycle()
+    val currentProvider by themeManager.contentProvider.collectAsStateWithLifecycle()
     var showProfileDialog by remember { mutableStateOf(false) }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val currentPlayingTrack by playerManager.currentTrack.collectAsStateWithLifecycle()
+    val firebaseUser by viewModel.firebaseManager.currentUser.collectAsStateWithLifecycle()
+    val isSyncingFirebase by viewModel.firebaseManager.isSyncing.collectAsStateWithLifecycle()
     val pullRefreshState = rememberPullToRefreshState()
 
     var selectedTrackForOptions by remember { mutableStateOf<PlayableTrack?>(null) }
@@ -96,7 +99,7 @@ fun HomeScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 114.dp)
+                        .padding(top = 160.dp)
                         .align(Alignment.TopCenter)
                 ) {
                     LoadingIndicator()
@@ -106,7 +109,7 @@ fun HomeScreen(
                     state = pullRefreshState,
                     isRefreshing = isRefreshing,
                     modifier = Modifier
-                        .padding(top = 114.dp)
+                        .padding(top = 160.dp)
                         .align(Alignment.TopCenter)
                 )
             }
@@ -118,7 +121,7 @@ fun HomeScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 110.dp)
+                        .padding(top = 160.dp)
                 ) {
                     repeat(3) {
                         ShelfSkeleton()
@@ -130,7 +133,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 24.dp)
-                        .padding(top = 110.dp, bottom = 120.dp),
+                        .padding(top = 160.dp, bottom = 120.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -167,12 +170,17 @@ fun HomeScreen(
             is HomeUiState.Success -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 112.dp, bottom = 165.dp) // Leave space for fixed header and floating controls over mask
+                    contentPadding = PaddingValues(top = 165.dp, bottom = 165.dp) // Leave space for fixed header with filter chips and floating controls
                 ) {
                     items(state.shelves, key = { it.id }) { shelf ->
                         HomeShelfSection(
                             shelf = shelf,
                             currentPlayingId = currentPlayingTrack?.id,
+                            isFirebaseSignedIn = firebaseUser != null,
+                            isSyncingFirebase = isSyncingFirebase,
+                            onSyncFirebase = {
+                                viewModel.syncPlaylistsToFirebase(context)
+                            },
                             onPlaySong = { song, shelfSongs ->
                                 viewModel.playTrack(song.toPlayableTrack(), shelfSongs.map { it.toPlayableTrack() })
                             },
@@ -226,21 +234,59 @@ fun HomeScreen(
                             .padding(end = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // 1. SMusic Brand Upper (Clear & Vibrant)
-                        Text(
-                            text = "SMusic",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Black,
-                                fontSize = 26.sp,
-                                letterSpacing = (-0.5).sp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
+                        // 1. SMusic Brand Upper (Clear & Vibrant) with Content Provider Pill
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "SMusic",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 26.sp,
+                                    letterSpacing = (-0.5).sp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
                                     )
                                 )
                             )
-                        )
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                ),
+                                modifier = Modifier
+                                    .clickable { onNavigateToSettings() }
+                                    .testTag("home_provider_badge")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.CloudQueue,
+                                        contentDescription = "Content Provider",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = currentProvider.displayName,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
 
                         // 2. Good Morning Niche with Mask Styled Frosted Glass Pill (Shows clear Nickname)
                         Row(
@@ -347,6 +393,42 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                // YouTube Music Style Mood & Category Filter Chips
+                val currentCategory by viewModel.selectedLanguage.collectAsStateWithLifecycle()
+                val categories = listOf("All", "Energize", "Workout", "Relax", "Commute", "Focus", "Hindi", "Punjabi", "English")
+
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(categories) { category ->
+                        val isSelected = currentCategory.equals(category, ignoreCase = true)
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.60f else 0.85f),
+                            contentColor = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                            border = if (!isSelected) androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            ) else null,
+                            modifier = Modifier
+                                .clickable { viewModel.selectLanguage(category) }
+                                .testTag("category_chip_$category")
+                        ) {
+                            Text(
+                                text = category,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    fontSize = 12.5.sp
+                                ),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -394,6 +476,9 @@ fun HomeScreen(
 fun HomeShelfSection(
     shelf: MusicShelf,
     currentPlayingId: String?,
+    isFirebaseSignedIn: Boolean = false,
+    isSyncingFirebase: Boolean = false,
+    onSyncFirebase: (() -> Unit)? = null,
     onPlaySong: (Song, List<Song>) -> Unit,
     onMoreSong: (Song) -> Unit,
     onAlbumClick: (Album) -> Unit,
@@ -405,17 +490,73 @@ fun HomeShelfSection(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp)
+            .testTag("home_shelf_${shelf.id}")
     ) {
-        // Clean Bold Category Header without small cluttered text
-        Box(modifier = Modifier.padding(horizontal = 20.dp)) {
-            Text(
-                text = shelf.title,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        // Clean Bold Category Header with optional Firebase Cloud Sync pill for bottom playlists
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = shelf.title,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (shelf.id == "smusic_playlists" && shelf.subtitle.isNotBlank()) {
+                    Text(
+                        text = shelf.subtitle,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            if (shelf.id == "smusic_playlists" && onSyncFirebase != null) {
+                FilledTonalButton(
+                    onClick = onSyncFirebase,
+                    enabled = !isSyncingFirebase,
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .height(36.dp)
+                        .testTag("home_firebase_sync_button")
+                ) {
+                    if (isSyncingFirebase) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(15.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Syncing...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(
+                            imageVector = if (isFirebaseSignedIn) Icons.Default.CloudDone else Icons.Default.CloudUpload,
+                            contentDescription = "Sync Firebase Playlists",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isFirebaseSignedIn) "Cloud Synced" else "Sync Firebase",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

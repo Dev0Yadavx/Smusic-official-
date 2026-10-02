@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "PlaylistDocument": {
+      "title": "PlaylistDocument",
+      "description": "A cloud-synced music playlist with artwork, title, metadata, and serialized tracklist.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique playlist identifier"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title of the playlist"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Subtitle such as track count or curator"
+        },
+        "description": {
+          "type": "string",
+          "description": "Playlist description"
+        },
+        "artwork": {
+          "type": "string",
+          "description": "Primary cover artwork URL"
+        },
+        "previewArtworks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Up to 4 song artwork URLs for mosaic cover rendering"
+        },
+        "songCount": {
+          "type": "integer",
+          "description": "Number of songs in the playlist"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the playlist owner"
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Display name of the playlist owner"
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether the playlist is publicly readable by authenticated users"
+        },
+        "songsJson": {
+          "type": "string",
+          "description": "Serialized JSON array of tracks in the playlist"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when playlist was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when playlist was last updated"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "subtitle",
+        "description",
+        "artwork",
+        "previewArtworks",
+        "songCount",
+        "ownerId",
+        "ownerName",
+        "isPublic",
+        "songsJson",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/playlists/{playlistId}": {
+      "schema": {
+        "$ref": "#/entities/PlaylistDocument"
+      },
+      "description": "Cloud-synced playlists created or imported by users"
+    }
+  }
+}

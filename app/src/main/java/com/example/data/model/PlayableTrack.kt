@@ -1,7 +1,7 @@
 package com.example.data.model
 
 enum class TrackSource {
-    JIOSAAVN, LOCAL, DOWNLOAD
+    JIOSAAVN, YOUTUBE_MUSIC, LOCAL, DOWNLOAD
 }
 
 data class PlayableTrack(

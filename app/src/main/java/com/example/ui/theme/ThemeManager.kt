@@ -127,14 +127,26 @@ class ThemeManager private constructor(context: Context) {
     val isAmoledBlack: StateFlow<Boolean> = _isAmoledBlack.asStateFlow()
 
     private val _isLiquidGlassEnabled = MutableStateFlow(
-        prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, true)
+        prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, false)
     )
     val isLiquidGlassEnabled: StateFlow<Boolean> = _isLiquidGlassEnabled.asStateFlow()
 
     private val _isDynamicSongBackgroundEnabled = MutableStateFlow(
-        prefs.getBoolean(KEY_DYNAMIC_SONG_BACKGROUND, true)
+        prefs.getBoolean(KEY_DYNAMIC_SONG_BACKGROUND, false)
     )
     val isDynamicSongBackgroundEnabled: StateFlow<Boolean> = _isDynamicSongBackgroundEnabled.asStateFlow()
+
+    private val _isDynamicSongThemeEnabled = MutableStateFlow(
+        prefs.getBoolean(KEY_DYNAMIC_SONG_THEME, true)
+    )
+    val isDynamicSongThemeEnabled: StateFlow<Boolean> = _isDynamicSongThemeEnabled.asStateFlow()
+
+    private val _contentProvider = MutableStateFlow(
+        com.example.data.model.ContentProvider.fromId(
+            prefs.getString(KEY_CONTENT_PROVIDER, com.example.data.model.ContentProvider.JIO_SAAVN.id)
+        )
+    )
+    val contentProvider: StateFlow<com.example.data.model.ContentProvider> = _contentProvider.asStateFlow()
 
     private val _accentPalette = MutableStateFlow(
         AccentPalette.fromId(prefs.getString(KEY_ACCENT_PALETTE, AccentPalette.VIOLET.id) ?: AccentPalette.VIOLET.id)
@@ -194,6 +206,16 @@ class ThemeManager private constructor(context: Context) {
     fun setDynamicSongBackgroundEnabled(enabled: Boolean) {
         _isDynamicSongBackgroundEnabled.value = enabled
         prefs.edit().putBoolean(KEY_DYNAMIC_SONG_BACKGROUND, enabled).apply()
+    }
+
+    fun setDynamicSongThemeEnabled(enabled: Boolean) {
+        _isDynamicSongThemeEnabled.value = enabled
+        prefs.edit().putBoolean(KEY_DYNAMIC_SONG_THEME, enabled).apply()
+    }
+
+    fun setContentProvider(provider: com.example.data.model.ContentProvider) {
+        _contentProvider.value = provider
+        prefs.edit().putString(KEY_CONTENT_PROVIDER, provider.id).apply()
     }
 
     fun setAccentPalette(palette: AccentPalette) {
@@ -260,6 +282,8 @@ class ThemeManager private constructor(context: Context) {
         private const val KEY_AMOLED_BLACK = "key_amoled_black"
         private const val KEY_LIQUID_GLASS_ENABLED = "key_liquid_glass_enabled"
         private const val KEY_DYNAMIC_SONG_BACKGROUND = "key_dynamic_song_background"
+        private const val KEY_DYNAMIC_SONG_THEME = "key_dynamic_song_theme_v1"
+        private const val KEY_CONTENT_PROVIDER = "key_content_provider_v1"
         private const val KEY_ACCENT_PALETTE = "key_accent_palette"
         private const val KEY_FONT_OPTION = "key_font_option_v2"
         private const val KEY_NOW_PLAYING_STYLE = "key_now_playing_style"

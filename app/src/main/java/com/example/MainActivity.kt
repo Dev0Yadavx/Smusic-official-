@@ -61,12 +61,6 @@ import com.example.ui.details.AlbumDetailScreen
 import com.example.ui.details.ArtistDetailScreen
 import com.example.ui.details.PlaylistDetailScreen
 import com.example.ui.home.HomeScreen
-import dev.chrisbanes.haze.HazeInput
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.rememberHazeState
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.hazeBlur
-import dev.chrisbanes.haze.hazeSource
 import com.example.ui.home.HomeViewModel
 import com.example.ui.library.LibraryScreen
 import com.example.ui.library.LibraryViewModel
@@ -118,21 +112,55 @@ class MainActivity : ComponentActivity() {
             val themeMode by themeManager.themeMode.collectAsState()
             val useDynamicColor by themeManager.useDynamicColor.collectAsState()
             val isAmoledBlack by themeManager.isAmoledBlack.collectAsState()
-            val isLiquidGlassEnabled by themeManager.isLiquidGlassEnabled.collectAsState()
             val accentPalette by themeManager.accentPalette.collectAsState()
             val fontOption by themeManager.fontOption.collectAsState()
-            val isDynamicSongBackgroundEnabled by themeManager.isDynamicSongBackgroundEnabled.collectAsState()
+            val isDynamicSongThemeEnabled by themeManager.isDynamicSongThemeEnabled.collectAsState()
             val hasAgreedPermissions by themeManager.hasAgreedPermissions.collectAsState()
+
+            val currentTrack by playerManager.currentTrack.collectAsState()
+
+            val isDarkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+            }
+
+            val dynamicSongColors = if (isDynamicSongThemeEnabled && currentTrack != null) {
+                com.example.ui.player.rememberDynamicSongColors(
+                    artworkUrl = currentTrack?.artwork,
+                    seedKey = currentTrack?.id ?: currentTrack?.title ?: "",
+                    isDark = isDarkTheme
+                )
+            } else null
 
             SMusicTheme(
                 themeMode = themeMode,
                 dynamicColor = useDynamicColor,
                 isAmoledBlack = isAmoledBlack,
                 accentPalette = accentPalette,
-                fontOption = fontOption
+                fontOption = fontOption,
+                songSeedColor = dynamicSongColors?.seedColor ?: dynamicSongColors?.primary,
+                songPrimaryColor = dynamicSongColors?.primary,
+                songSecondaryColor = dynamicSongColors?.secondary
             ) {
                 var showSplash by rememberSaveable { mutableStateOf(true) }
                 var isMainContentReady by rememberSaveable { mutableStateOf(false) }
+
+                val notifPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { _ -> }
+
+                LaunchedEffect(showSplash, hasAgreedPermissions) {
+                    if (!showSplash && hasAgreedPermissions && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val granted = ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (!granted) {
+                            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
 
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(150)
@@ -144,8 +172,6 @@ class MainActivity : ComponentActivity() {
                 var currentSubScreen by remember { mutableStateOf<SubScreen>(SubScreen.None) }
                 var isNowPlayingOpen by remember { mutableStateOf(false) }
 
-                val currentTrack by playerManager.currentTrack.collectAsState()
-
                 // Intercept back button when Now Playing or Subscreen is open
                 BackHandler(enabled = isNowPlayingOpen || currentSubScreen !is SubScreen.None) {
                     if (isNowPlayingOpen) {
@@ -155,82 +181,16 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val hazeState = rememberHazeState()
-
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    // Content and Dynamic Background Layer (hazeSource applied strictly to this background layer)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .hazeSource(hazeState)
-                    ) {
-                        // Full UI Ambient Blurred Song Artwork Background
-                        val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-                        val trackArtwork = currentTrack?.artwork ?: ""
-
-                        AnimatedVisibility(
-                            visible = isDynamicSongBackgroundEnabled && currentTrack != null && trackArtwork.isNotBlank(),
-                            enter = fadeIn(animationSpec = tween(700)),
-                            exit = fadeOut(animationSpec = tween(700)),
+                    if (isMainContentReady || !showSplash) {
+                        // Main Content Layer with clean solid background
+                        Box(
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                Crossfade(
-                                    targetState = trackArtwork,
-                                    animationSpec = tween(700),
-                                    label = "dynamic_artwork_crossfade",
-                                    modifier = Modifier.fillMaxSize()
-                                ) { art ->
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(art)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .scale(1.45f)
-                                            .blur(65.dp),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-
-                                // Contrast-preserving gradient scrim overlay across all screens (subtle in light mode so colors shine through at top)
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            if (isDark) {
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        Color.Black.copy(alpha = 0.68f),
-                                                        Color.Black.copy(alpha = 0.48f),
-                                                        Color.Black.copy(alpha = 0.75f)
-                                                    )
-                                                )
-                                            } else {
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        Color.White.copy(alpha = 0.28f),
-                                                        Color.White.copy(alpha = 0.16f),
-                                                        Color.White.copy(alpha = 0.35f)
-                                                    )
-                                                )
-                                            }
-                                        )
-                                )
-                            }
-                        }
-
-                        if (isMainContentReady || !showSplash) {
-                            // Main Content Layer
-                            Box(
-                                modifier = Modifier.fillMaxSize()
-                            ) {
                                 when (val sub = currentSubScreen) {
                                     is SubScreen.Settings -> {
                                         SettingsScreen(
@@ -318,9 +278,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                    }
 
-                    // Floating Overlays Layer (OUTSIDE hazeSource to prevent recursion)
+                    // Floating Overlays Layer (Solid, high-contrast, zero blur or liquid glass)
                     if (isMainContentReady || !showSplash) {
                         Column(
                             modifier = Modifier
@@ -331,47 +290,23 @@ class MainActivity : ComponentActivity() {
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Thicker Mini Player with Full Frosted Glass HazeBlur (42.dp) & Solid Opacity
+                            // Solid High-Contrast Mini Player without Blur or Glass Effect
                             AnimatedVisibility(
                                 visible = currentTrack != null && !isNowPlayingOpen,
                                 enter = slideInVertically(initialOffsetY = { it / 2 }) + expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
                                 exit = slideOutVertically(targetOffsetY = { it / 2 }) + shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
                             ) {
-                                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-                                val miniPlayerModifier = if (isLiquidGlassEnabled) {
-                                    Modifier
+                                Surface(
+                                    shape = RoundedCornerShape(26.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f)
+                                    ),
+                                    shadowElevation = 8.dp,
+                                    tonalElevation = 4.dp,
+                                    modifier = Modifier
                                         .fillMaxWidth()
-                                        .hazeBlur(
-                                            input = HazeInput.Sources(hazeState),
-                                            style = HazeBlurStyle {
-                                                blurRadius(42.dp)
-                                            }
-                                        )
-                                        .clip(RoundedCornerShape(28.dp))
-                                        .background(
-                                            if (isDark) Color(0xFF14141C).copy(alpha = 0.92f)
-                                            else Color(0xFFFAFBFD).copy(alpha = 0.94f)
-                                        )
-                                        .border(
-                                            1.2.dp,
-                                            if (isDark) Color.White.copy(alpha = 0.22f)
-                                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                                            RoundedCornerShape(28.dp)
-                                        )
-                                } else {
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(28.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                                        .border(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                                            RoundedCornerShape(28.dp)
-                                        )
-                                }
-
-                                Box(
-                                    modifier = miniPlayerModifier
                                         .testTag("floating_mini_player_container")
                                 ) {
                                     MiniPlayer(
@@ -382,12 +317,10 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Full Frosted Glass Extended Bottom Navigation with HazeBlur (42.dp) & Solid Opacity
-                            LiquidGlassSplitBottomBar(
+                            // Solid Clean Bottom Navigation Bar without Blur or Glass Effect
+                            SolidSplitBottomBar(
                                 currentRootScreen = currentRootScreen,
                                 isSubScreenOpen = currentSubScreen !is SubScreen.None,
-                                hazeState = hazeState,
-                                isLiquidGlassEnabled = isLiquidGlassEnabled,
                                 onSelectTab = { screen ->
                                     currentRootScreen = screen
                                     currentSubScreen = SubScreen.None
@@ -457,16 +390,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun LiquidGlassSplitBottomBar(
+fun SolidSplitBottomBar(
     currentRootScreen: RootScreen,
     isSubScreenOpen: Boolean,
-    hazeState: HazeState,
     onSelectTab: (RootScreen) -> Unit,
-    modifier: Modifier = Modifier,
-    isLiquidGlassEnabled: Boolean = true
+    modifier: Modifier = Modifier
 ) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
     Row(
         modifier = modifier
             .wrapContentWidth()
@@ -474,48 +403,24 @@ fun LiquidGlassSplitBottomBar(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val navBoxModifier = if (isLiquidGlassEnabled) {
-            Modifier
-                .hazeBlur(
-                    input = HazeInput.Sources(hazeState),
-                    style = HazeBlurStyle {
-                        blurRadius(42.dp)
-                    }
-                )
-                .clip(RoundedCornerShape(42.dp))
-                .background(
-                    if (isDark) Color(0xFF14141C).copy(alpha = 0.92f)
-                    else Color(0xFFFAFBFD).copy(alpha = 0.94f)
-                )
-                .border(
-                    1.2.dp,
-                    if (isDark) Color.White.copy(alpha = 0.22f)
-                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                    RoundedCornerShape(42.dp)
-                )
-        } else {
-            Modifier
-                .clip(RoundedCornerShape(42.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(
-                    1.dp,
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                    RoundedCornerShape(42.dp)
-                )
-        }
-
-        // 1. Bottom Navigation Capsule (Home & Library - Longer & more spacious)
-        Box(
-            modifier = navBoxModifier
-                .testTag("nav_capsule_home_library"),
-            contentAlignment = Alignment.Center
+        // 1. Bottom Navigation Capsule (Home & Library - Solid Material 3 Surface)
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f)
+            ),
+            shadowElevation = 8.dp,
+            tonalElevation = 4.dp,
+            modifier = Modifier.testTag("nav_capsule_home_library")
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                LiquidGlassNavPill(
+                ExpressiveNavPill(
                     selected = currentRootScreen == RootScreen.HOME && !isSubScreenOpen,
                     selectedIcon = Icons.Rounded.Home,
                     unselectedIcon = Icons.Outlined.Home,
@@ -524,7 +429,7 @@ fun LiquidGlassSplitBottomBar(
                     testTag = "nav_item_home"
                 )
 
-                LiquidGlassNavPill(
+                ExpressiveNavPill(
                     selected = currentRootScreen == RootScreen.LIBRARY && !isSubScreenOpen,
                     selectedIcon = Icons.Rounded.LibraryMusic,
                     unselectedIcon = Icons.Outlined.LibraryMusic,
@@ -535,17 +440,23 @@ fun LiquidGlassSplitBottomBar(
             }
         }
 
-        // 2. Separate Rounded Search Button (Spacious)
-        Box(
-            modifier = navBoxModifier
-                .testTag("nav_search_container"),
-            contentAlignment = Alignment.Center
+        // 2. Separate Rounded Search Button (Solid Material 3 Surface)
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f)
+            ),
+            shadowElevation = 8.dp,
+            tonalElevation = 4.dp,
+            modifier = Modifier.testTag("nav_search_container")
         ) {
             Box(
                 modifier = Modifier.padding(7.dp),
                 contentAlignment = Alignment.Center
             ) {
-                LiquidGlassNavPill(
+                ExpressiveNavPill(
                     selected = currentRootScreen == RootScreen.SEARCH && !isSubScreenOpen,
                     selectedIcon = Icons.Rounded.Search,
                     unselectedIcon = Icons.Outlined.Search,
@@ -559,7 +470,7 @@ fun LiquidGlassSplitBottomBar(
 }
 
 @Composable
-fun LiquidGlassNavPill(
+fun ExpressiveNavPill(
     selected: Boolean,
     selectedIcon: ImageVector,
     unselectedIcon: ImageVector,

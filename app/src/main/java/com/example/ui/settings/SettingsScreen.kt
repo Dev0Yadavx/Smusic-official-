@@ -86,8 +86,7 @@ fun SettingsScreen(
     val currentThemeMode by themeManager.themeMode.collectAsState()
     val useDynamicColor by themeManager.useDynamicColor.collectAsState()
     val isAmoledBlack by themeManager.isAmoledBlack.collectAsState()
-    val isLiquidGlassEnabled by themeManager.isLiquidGlassEnabled.collectAsState()
-    val isDynamicSongBackgroundEnabled by themeManager.isDynamicSongBackgroundEnabled.collectAsState()
+    val isDynamicSongThemeEnabled by themeManager.isDynamicSongThemeEnabled.collectAsState()
     val accentPalette by themeManager.accentPalette.collectAsState()
     val currentFontOption by themeManager.fontOption.collectAsState()
     val userNickname by themeManager.userNickname.collectAsState()
@@ -97,11 +96,13 @@ fun SettingsScreen(
     val isEqEnabled by equalizerManager.isEnabled.collectAsState()
     val selectedEqPreset by equalizerManager.selectedPreset.collectAsState()
     val isAutoplayEnabled by playerManager.isAutoplayEnabled.collectAsState()
+    val contentProvider by themeManager.contentProvider.collectAsState()
 
     var showProfileCardDialog by remember { mutableStateOf(false) }
     var pauseOnDisconnect by remember { mutableStateOf(true) }
     var selectedQuality by remember { mutableStateOf(StreamUrlResolver.AudioQuality.HIGH) }
 
+    var showContentProviderDialog by remember { mutableStateOf(false) }
     var showThemeModeDialog by remember { mutableStateOf(false) }
     var showAccentDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
@@ -219,8 +220,19 @@ fun SettingsScreen(
 
             // 2. AUDIO & PLAYBACK CATEGORY (Large Card Style Shape)
             item {
-                SettingsCategoryHeader(title = "Audio & Playback")
+                SettingsCategoryHeader(title = "Audio & Content Provider")
                 SettingsLargeCard {
+                    // Content Provider (JioSaavn vs YouTube Music)
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.CloudQueue,
+                        title = "Content Provider",
+                        valueText = contentProvider.displayName,
+                        onClick = { showContentProviderDialog = true },
+                        testTag = "settings_content_provider_item"
+                    )
+
+                    SettingsDivider()
+
                     // Equalizer Option Item
                     SettingsOptionRow(
                         icon = Icons.Outlined.Equalizer,
@@ -332,25 +344,14 @@ fun SettingsScreen(
 
                     SettingsDivider()
 
-                    // Liquid Glass On / Off Option Item
+                    // Dynamic Song Colors On / Off Option Item
                     SettingsToggleOptionRow(
-                        icon = Icons.Outlined.BlurOn,
-                        title = "Liquid Glass",
-                        checked = isLiquidGlassEnabled,
-                        onCheckedChange = { themeManager.setLiquidGlassEnabled(it) },
-                        testTag = "settings_liquid_glass_item"
-                    )
-
-                    SettingsDivider()
-
-                    // Dynamic Song Background On / Off Option Item
-                    SettingsToggleOptionRow(
-                        icon = Icons.Outlined.Wallpaper,
-                        title = "Dynamic Background",
-                        subtitle = "Apply blurred album artwork across all app screens",
-                        checked = isDynamicSongBackgroundEnabled,
-                        onCheckedChange = { themeManager.setDynamicSongBackgroundEnabled(it) },
-                        testTag = "settings_dynamic_song_background_item"
+                        icon = Icons.Outlined.AutoAwesome,
+                        title = "Dynamic Song Colors",
+                        subtitle = "Adapt app theme and accent colors to currently playing song",
+                        checked = isDynamicSongThemeEnabled,
+                        onCheckedChange = { themeManager.setDynamicSongThemeEnabled(it) },
+                        testTag = "settings_dynamic_song_theme_item"
                     )
 
                     SettingsDivider()
@@ -406,6 +407,111 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    // Content Provider Selection Dialog (JioSaavn vs YouTube Music)
+    if (showContentProviderDialog) {
+        AlertDialog(
+            onDismissRequest = { showContentProviderDialog = false },
+            title = {
+                Text(
+                    text = "Content Provider",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Switch between JioSaavn and YouTube Music to stream your favorite tracks:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    com.example.data.model.ContentProvider.entries.forEach { provider ->
+                        val isSelected = contentProvider == provider
+                        Surface(
+                            onClick = {
+                                themeManager.setContentProvider(provider)
+                                showContentProviderDialog = false
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Switched content provider to ${provider.displayName}")
+                                }
+                            },
+                            shape = RoundedCornerShape(18.dp),
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            },
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("provider_option_${provider.id}")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = provider.displayName,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = provider.badge,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = provider.subtitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        themeManager.setContentProvider(provider)
+                                        showContentProviderDialog = false
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Switched content provider to ${provider.displayName}")
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showContentProviderDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
     }
 
     // Theme Mode Dialog (Only item options)

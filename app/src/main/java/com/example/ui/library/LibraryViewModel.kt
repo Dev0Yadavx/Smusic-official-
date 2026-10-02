@@ -25,6 +25,7 @@ enum class LibraryTab {
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
 
     val repository = MusicRepository(application)
+    val firebaseManager = com.example.data.remote.FirebasePlaylistManager.getInstance(application)
     private val playerManager = PlayerManager.getInstance(application)
     private val downloadManager = com.example.download.SongDownloadManager.getInstance(application)
 
@@ -42,6 +43,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     val playlistsWithPreviews: StateFlow<List<com.example.data.model.UserPlaylistSummary>> = repository.userPlaylistsWithPreviews
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val cloudPlaylists: StateFlow<List<com.example.data.model.Playlist>> = firebaseManager.cloudPlaylists
 
     private val _localSongs = MutableStateFlow<List<PlayableTrack>>(emptyList())
     val localSongs: StateFlow<List<PlayableTrack>> = _localSongs.asStateFlow()
@@ -98,6 +101,22 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun deletePlaylist(id: Long) {
         viewModelScope.launch {
             repository.deletePlaylist(id)
+        }
+    }
+
+    fun deleteCloudPlaylist(playlistId: String) {
+        viewModelScope.launch {
+            firebaseManager.deleteCloudPlaylist(playlistId)
+        }
+    }
+
+    fun syncPlaylistsToFirebase(activityContext: android.content.Context) {
+        viewModelScope.launch {
+            if (firebaseManager.currentUser.value == null) {
+                val signInResult = firebaseManager.signInWithGoogle(activityContext)
+                if (signInResult.isFailure) return@launch
+            }
+            repository.syncAllPlaylistsToFirebase()
         }
     }
 

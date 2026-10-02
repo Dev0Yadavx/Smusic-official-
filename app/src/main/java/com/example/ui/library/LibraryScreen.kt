@@ -118,9 +118,13 @@ fun LibraryScreen(
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val playlistsWithPreviews by viewModel.playlistsWithPreviews.collectAsStateWithLifecycle()
+    val cloudPlaylists by viewModel.cloudPlaylists.collectAsStateWithLifecycle()
+    val firebaseUser by viewModel.firebaseManager.currentUser.collectAsStateWithLifecycle()
+    val isSyncingFirebase by viewModel.firebaseManager.isSyncing.collectAsStateWithLifecycle()
     val localSongs by viewModel.localSongs.collectAsStateWithLifecycle()
     val isScanningLocal by viewModel.isScanningLocal.collectAsStateWithLifecycle()
     val currentTrack by playerManager.currentTrack.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var showOverviewGrid by remember { mutableStateOf(true) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -517,7 +521,10 @@ fun LibraryScreen(
                             }
                         }
                         LibraryTab.PLAYLISTS -> {
-                            if (playlistsWithPreviews.isEmpty()) {
+                            val totalPlaylistsCount = playlistsWithPreviews.size + cloudPlaylists.count { cp ->
+                                playlistsWithPreviews.none { it.name.equals(cp.title, ignoreCase = true) }
+                            }
+                            if (playlistsWithPreviews.isEmpty() && cloudPlaylists.isEmpty()) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -527,12 +534,29 @@ fun LibraryScreen(
                                 ) {
                                     JioSaavnImportSquareCard(
                                         onClick = { showImportPlaylistSheet = true },
-                                        modifier = Modifier.padding(bottom = 20.dp)
+                                        modifier = Modifier.padding(bottom = 14.dp)
                                     )
+
+                                    FilledTonalButton(
+                                        onClick = { viewModel.syncPlaylistsToFirebase(context) },
+                                        shape = RoundedCornerShape(20.dp),
+                                        modifier = Modifier.padding(bottom = 16.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (firebaseUser != null) Icons.Default.CloudDone else Icons.Default.CloudUpload,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            if (firebaseUser != null) "Firebase Cloud Connected" else "Connect Firebase Cloud",
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
 
                                     EmptyLibraryState(
                                         title = "Create Your First Playlist",
-                                        message = "Organize songs by your mood, favorite artists, or import playlists directly from a link.",
+                                        message = "Organize songs by your mood, favorite artists, or import & sync playlists with Firebase Cloud.",
                                         icon = Icons.Outlined.QueueMusic,
                                         accentColor = Color(0xFF8B5CF6),
                                         actionText = "Create Playlist",
@@ -549,12 +573,31 @@ fun LibraryScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "${playlistsWithPreviews.size} ${if (playlistsWithPreviews.size == 1) "Playlist" else "Playlists"}",
+                                            text = "$totalPlaylistsCount ${if (totalPlaylistsCount == 1) "Playlist" else "Playlists"}",
                                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
 
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            FilledTonalButton(
+                                                onClick = { viewModel.syncPlaylistsToFirebase(context) },
+                                                enabled = !isSyncingFirebase,
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                shape = RoundedCornerShape(20.dp),
+                                                modifier = Modifier.testTag("library_firebase_sync_button")
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (firebaseUser != null) Icons.Default.CloudDone else Icons.Default.CloudUpload,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    if (isSyncingFirebase) "Syncing" else if (firebaseUser != null) "Synced" else "Firebase",
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+
                                             FilledTonalButton(
                                                 onClick = { showImportPlaylistSheet = true },
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -571,7 +614,7 @@ fun LibraryScreen(
 
                                             FilledTonalButton(
                                                 onClick = { showCreatePlaylistDialog = true },
-                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                                 shape = RoundedCornerShape(20.dp)
                                             ) {
                                                 Icon(
@@ -580,7 +623,7 @@ fun LibraryScreen(
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
-                                                Text("New Playlist", fontWeight = FontWeight.SemiBold)
+                                                Text("New", fontWeight = FontWeight.SemiBold)
                                             }
                                         }
                                     }
@@ -604,11 +647,30 @@ fun LibraryScreen(
                                             )
                                         }
 
-                                        items(playlistsWithPreviews, key = { it.id }) { playlist ->
+                                        items(playlistsWithPreviews, key = { "local_${it.id}" }) { playlist ->
                                             PlaylistGridCard(
                                                 playlist = playlist,
                                                 onClick = { onNavigateToPlaylist?.invoke("local_${playlist.id}") },
                                                 onDelete = { viewModel.deletePlaylist(playlist.id) }
+                                            )
+                                        }
+
+                                        val extraCloud = cloudPlaylists.filter { cp ->
+                                            playlistsWithPreviews.none { it.name.equals(cp.title, ignoreCase = true) }
+                                        }
+                                        items(extraCloud, key = { it.id }) { cloudPl ->
+                                            PlaylistGridCard(
+                                                playlist = UserPlaylistSummary(
+                                                    id = cloudPl.id.hashCode().toLong(),
+                                                    name = cloudPl.title,
+                                                    description = cloudPl.description,
+                                                    songCount = cloudPl.songCount,
+                                                    previewArtworks = cloudPl.previewArtworks.ifEmpty {
+                                                        if (cloudPl.artwork.isNotBlank()) listOf(cloudPl.artwork) else emptyList()
+                                                    }
+                                                ),
+                                                onClick = { onNavigateToPlaylist?.invoke(cloudPl.id) },
+                                                onDelete = { viewModel.deleteCloudPlaylist(cloudPl.id) }
                                             )
                                         }
                                     }

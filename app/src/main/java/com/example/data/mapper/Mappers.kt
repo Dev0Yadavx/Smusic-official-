@@ -248,13 +248,21 @@ object PlaylistMapper {
             songsList.addAll(SongMapper.mapList(listElement.asJsonArray))
         }
 
+        val resolvedArt = if (artwork.isBlank() && songsList.isNotEmpty()) songsList.first().artwork else artwork
+        val previews = buildList {
+            songsList.mapNotNull { it.artwork.takeIf { art -> art.isNotBlank() } }.distinct().take(4).forEach { add(it) }
+            if (isEmpty() && resolvedArt.isNotBlank()) add(resolvedArt)
+        }
+        val finalCount = if (songsList.isNotEmpty()) songsList.size else songCount
+
         return Playlist(
             id = id,
             title = if (title.isBlank()) "Playlist" else title,
-            subtitle = subtitle,
+            subtitle = if (subtitle.isBlank() && finalCount > 0) "$finalCount Songs" else subtitle,
             description = description,
-            artwork = if (artwork.isBlank() && songsList.isNotEmpty()) songsList.first().artwork else artwork,
-            songCount = if (songsList.isNotEmpty()) songsList.size else songCount,
+            artwork = resolvedArt,
+            previewArtworks = previews,
+            songCount = finalCount,
             songs = songsList
         )
     }

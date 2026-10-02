@@ -2,6 +2,10 @@ package com.example
 
 import android.app.Application
 import com.example.data.local.SMusicDatabase
+import com.example.player.SMusicNotificationHelper
+import com.google.firebase.Firebase
+import com.google.firebase.appcheck.appCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,9 +17,21 @@ class SMusicApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Initialize Firebase App Check
+        try {
+            Firebase.appCheck.installAppCheckProviderFactory(
+                DebugAppCheckProviderFactory.getInstance()
+            )
+        } catch (_: Exception) {}
+
+        // Create system notification channels immediately
+        SMusicNotificationHelper.ensureChannelsCreated(this)
+
         // Pre-initialize database asynchronously off the main thread
         appScope.launch {
             SMusicDatabase.getInstance(this@SMusicApplication)
         }
     }
 }
+

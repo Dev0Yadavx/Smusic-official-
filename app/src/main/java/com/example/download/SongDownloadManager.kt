@@ -216,6 +216,14 @@ class SongDownloadManager private constructor(private val context: Context) {
                                             )
                                         )
                                         downloadedDao.updateProgress(track.id, currentProgress, "DOWNLOADING")
+                                        com.example.player.SMusicNotificationHelper.showDownloadProgressNotification(
+                                            context = context,
+                                            songId = track.id,
+                                            title = track.title,
+                                            artist = track.artist,
+                                            progress = currentProgress,
+                                            isPaused = false
+                                        )
                                     }
                                 }
                             }
@@ -252,6 +260,14 @@ class SongDownloadManager private constructor(private val context: Context) {
                     )
                 )
 
+                com.example.player.SMusicNotificationHelper.showDownloadCompletedNotification(
+                    context = context,
+                    songId = track.id,
+                    title = track.title,
+                    artist = track.artist,
+                    artworkUrl = if (localArtworkPath.isNotBlank()) localArtworkPath else track.artwork
+                )
+
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Downloaded: ${track.title}", Toast.LENGTH_SHORT).show()
                 }
@@ -262,10 +278,12 @@ class SongDownloadManager private constructor(private val context: Context) {
 
             } catch (e: CancellationException) {
                 Log.d(tag, "Download cancelled for ${track.title}")
+                com.example.player.SMusicNotificationHelper.cancelDownloadNotification(context, track.id)
                 removeTaskState(track.id)
                 downloadedDao.deleteDownloadedSong(track.id)
             } catch (e: Exception) {
                 Log.e(tag, "Download error for ${track.title}: ${e.message}", e)
+                com.example.player.SMusicNotificationHelper.cancelDownloadNotification(context, track.id)
                 updateTaskState(
                     initialTask.copy(
                         status = DownloadStatus.FAILED,

@@ -320,10 +320,14 @@ class PlayerManager private constructor(private val appContext: Context) {
     private val sessionPlayer: SessionPlayerImpl by lazy { SessionPlayerImpl() }
 
     private fun invalidateSessionState() {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
+        val notifyAction = {
             sessionPlayer.notifyStateChanged()
+            (serviceContext as? MusicPlaybackService)?.syncMediaNotification()
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            notifyAction()
         } else {
-            mainHandler.post { sessionPlayer.notifyStateChanged() }
+            mainHandler.post { notifyAction() }
         }
     }
 
@@ -754,7 +758,9 @@ class PlayerManager private constructor(private val appContext: Context) {
                 if (mediaPlayer !== errorMp) return@setOnErrorListener true
                 // Ignore -38 state notifications if triggered during reset
                 if (what == -38) return@setOnErrorListener true
-                Log.w(tag, "MediaPlayer fallback triggered (what=$what, extra=$extra) for ${track.title}")
+                val errMsg = "MediaPlayer error: what=$what, extra=$extra for track='${track.title}' (ID: ${track.id}, Source: ${track.source})"
+                println("[SMusic-Terminal-ERROR] $errMsg")
+                Log.e(tag, errMsg)
                 _isBuffering.value = false
                 _isPlaying.value = false
                 isMediaPlayerPrepared = false
@@ -765,7 +771,9 @@ class PlayerManager private constructor(private val appContext: Context) {
 
             mp.prepareAsync()
         } catch (e: Exception) {
-            Log.w(tag, "Error configuring stream URL: ${e.message}")
+            val errMsg = "Error preparing MediaPlayer for '${track.title}': ${e.message}"
+            println("[SMusic-Terminal-ERROR] $errMsg")
+            Log.e(tag, errMsg, e)
             _isBuffering.value = false
             _isPlaying.value = false
             isMediaPlayerPrepared = false
@@ -875,8 +883,10 @@ class PlayerManager private constructor(private val appContext: Context) {
     private suspend fun loadArtworkBytes(artworkUrlOrPath: String): ByteArray? = withContext(Dispatchers.IO) {
         if (artworkUrlOrPath.isBlank()) return@withContext null
         try {
+            val resolvedUrl = com.example.data.remote.JioSaavnImageResolver.resolve(artworkUrlOrPath, 500)
+                .ifBlank { artworkUrlOrPath }
             val request = ImageRequest.Builder(appContext)
-                .data(artworkUrlOrPath)
+                .data(resolvedUrl)
                 .size(512, 512)
                 .allowHardware(false)
                 .build()
@@ -897,27 +907,51 @@ class PlayerManager private constructor(private val appContext: Context) {
     private fun handlePlaybackError() {
         val current = _currentTrack.value ?: return
         val currentUrl = current.streamUrl
+        println("[SMusic-Terminal-WARN] Handling playback error for '${current.title}' (URL: ${currentUrl.take(80)}...)")
 
-        // Try fallback quality
+        // 1. Try fallback bitrate quality
         val fallbackUrl = StreamUrlResolver.getFallbackUrl(currentUrl)
-        if (fallbackUrl != null) {
-            Log.d(tag, "Retrying with fallback stream quality: $fallbackUrl")
+        if (fallbackUrl != null && fallbackUrl != currentUrl) {
+            println("[SMusic-Terminal] Retrying with lower bitrate fallback: $fallbackUrl")
             val fallbackTrack = current.copy(streamUrl = fallbackUrl)
             _currentTrack.value = fallbackTrack
             updateMediaItemMetadata(fallbackTrack, fallbackTrack.artwork, null)
             prepareAndPlayUrl(fallbackTrack, fallbackUrl)
-        } else if (current.mediaPreviewUrl.isNotBlank() && currentUrl != current.mediaPreviewUrl) {
-            Log.d(tag, "Retrying with media preview URL: ${current.mediaPreviewUrl}")
+            return
+        }
+
+        // 2. Try media preview URL
+        if (current.mediaPreviewUrl.isNotBlank() && currentUrl != current.mediaPreviewUrl) {
+            println("[SMusic-Terminal] Retrying with preview URL: ${current.mediaPreviewUrl}")
             val previewUrl = current.mediaPreviewUrl.replace("http://", "https://")
             val previewTrack = current.copy(streamUrl = previewUrl)
             _currentTrack.value = previewTrack
             updateMediaItemMetadata(previewTrack, previewTrack.artwork, null)
             prepareAndPlayUrl(previewTrack, previewUrl)
-        } else {
-            currentPlaybackState = Player.STATE_IDLE
-            playWhenReadyRequested = false
-            _errorMessage.value = "Unable to play this song. Tap Retry."
-            invalidateSessionState()
+            return
+        }
+
+        // 3. Fallback: Search alternative audio stream source asynchronously
+        scope.launch(Dispatchers.IO) {
+            println("[SMusic-Terminal] Attempting secondary audio engine recovery for '${current.title}'...")
+            val recoveredUrl = repository.resolveAudioStreamFallback(current)
+            if (!recoveredUrl.isNullOrBlank() && recoveredUrl != currentUrl) {
+                withContext(Dispatchers.Main) {
+                    println("[SMusic-Terminal-SUCCESS] Recovered alternative stream for '${current.title}'. Resuming playback...")
+                    val recoveredTrack = current.copy(streamUrl = recoveredUrl)
+                    _currentTrack.value = recoveredTrack
+                    updateMediaItemMetadata(recoveredTrack, recoveredTrack.artwork, null)
+                    prepareAndPlayUrl(recoveredTrack, recoveredUrl)
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    println("[SMusic-Terminal-ERROR] Fatal: All audio sources failed for '${current.title}'")
+                    currentPlaybackState = Player.STATE_IDLE
+                    playWhenReadyRequested = false
+                    _errorMessage.value = "Unable to play '${current.title}'. Tap Retry."
+                    invalidateSessionState()
+                }
+            }
         }
     }
 

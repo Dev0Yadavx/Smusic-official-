@@ -38,14 +38,40 @@ class MusicRepository(
     // Cached home shelves for instant startup & offline support
     @Volatile
     private var cachedShelves: List<MusicShelf> = emptyList()
+    @Volatile
+    private var cachedProvider: ContentProvider? = null
+
+    fun invalidateCache() {
+        cachedShelves = emptyList()
+        cachedProvider = null
+    }
 
     /**
      * Loads Home content with shelves (Trending, Albums, Playlists, etc.)
      */
     fun getHomeContent(languages: String = "hindi,english,punjabi,bhojpuri,haryanvi"): Flow<NetworkResult<List<MusicShelf>>> = flow {
         emit(NetworkResult.Loading)
-        if (cachedShelves.isNotEmpty()) {
+
+        val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+        if (cachedProvider != provider) {
+            cachedShelves = emptyList()
+            cachedProvider = provider
+        } else if (cachedShelves.isNotEmpty()) {
             emit(NetworkResult.Success(cachedShelves))
+        }
+
+        if (provider == ContentProvider.YT_MUSIC) {
+            try {
+                val ytShelves = com.example.data.remote.YouTubeMusicProvider.getHomeShelves(languages)
+                if (ytShelves.isNotEmpty()) {
+                    cachedShelves = ytShelves
+                    cachedProvider = ContentProvider.YT_MUSIC
+                    emit(NetworkResult.Success(ytShelves))
+                    return@flow
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "YT Music home shelves fallback to JioSaavn: ${e.message}")
+            }
         }
 
         try {
@@ -53,6 +79,7 @@ class MusicRepository(
             if (response.isSuccessful && response.body() != null) {
                 val shelves = HomeMapper.map(response.body()!!)
                 cachedShelves = shelves
+                cachedProvider = provider
                 emit(NetworkResult.Success(shelves))
             } else {
                 if (cachedShelves.isEmpty()) {
@@ -74,6 +101,14 @@ class MusicRepository(
      */
      suspend fun searchSongs(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Song>> = withContext(Dispatchers.IO) {
          try {
+             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+             if (provider == ContentProvider.YT_MUSIC) {
+                 val ytSongs = com.example.data.remote.YouTubeMusicProvider.searchSongs(query)
+                 if (ytSongs.isNotEmpty()) {
+                     return@withContext NetworkResult.Success(ytSongs)
+                 }
+             }
+
              val response = api.searchSongs(query = query, page = page, limit = limit)
              if (response.isSuccessful && response.body() != null) {
                  val resultsArr = response.body()!!.getAsJsonArray("results")
@@ -94,6 +129,13 @@ class MusicRepository(
      */
      suspend fun searchAlbums(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Album>> = withContext(Dispatchers.IO) {
          try {
+             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+             if (provider == ContentProvider.YT_MUSIC) {
+                 val ytAlbums = com.example.data.remote.YouTubeMusicProvider.searchAlbums(query)
+                 if (ytAlbums.isNotEmpty()) {
+                     return@withContext NetworkResult.Success(ytAlbums)
+                 }
+             }
              val response = api.searchAlbums(query = query, page = page, limit = limit)
              if (response.isSuccessful && response.body() != null) {
                  val resultsArr = response.body()!!.getAsJsonArray("results")
@@ -114,6 +156,13 @@ class MusicRepository(
      */
      suspend fun searchPlaylists(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Playlist>> = withContext(Dispatchers.IO) {
          try {
+             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+             if (provider == ContentProvider.YT_MUSIC) {
+                 val ytPlaylists = com.example.data.remote.YouTubeMusicProvider.searchPlaylists(query)
+                 if (ytPlaylists.isNotEmpty()) {
+                     return@withContext NetworkResult.Success(ytPlaylists)
+                 }
+             }
              val response = api.searchPlaylists(query = query, page = page, limit = limit)
              if (response.isSuccessful && response.body() != null) {
                  val resultsArr = response.body()!!.getAsJsonArray("results")
@@ -134,6 +183,13 @@ class MusicRepository(
      */
      suspend fun searchArtists(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Artist>> = withContext(Dispatchers.IO) {
          try {
+             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+             if (provider == ContentProvider.YT_MUSIC) {
+                 val ytArtists = com.example.data.remote.YouTubeMusicProvider.searchArtists(query)
+                 if (ytArtists.isNotEmpty()) {
+                     return@withContext NetworkResult.Success(ytArtists)
+                 }
+             }
              val response = api.searchArtists(query = query, page = page, limit = limit)
              if (response.isSuccessful && response.body() != null) {
                  val body = response.body()!!
@@ -213,6 +269,18 @@ class MusicRepository(
         artworkFallback: String = ""
     ): NetworkResult<Album> = withContext(Dispatchers.IO) {
         try {
+            val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+            if (provider == ContentProvider.YT_MUSIC || albumId.startsWith("yt_")) {
+                val ytAlbum = com.example.data.remote.YouTubeMusicProvider.getAlbumDetails(
+                    albumIdOrTitle = albumId,
+                    fallbackTitle = titleFallback,
+                    fallbackArtist = artistFallback
+                )
+                if (ytAlbum != null && ytAlbum.songs.isNotEmpty()) {
+                    return@withContext NetworkResult.Success(ytAlbum)
+                }
+            }
+
             var album: Album? = null
             val isNumeric = albumId.all { it.isDigit() }
 
@@ -314,7 +382,24 @@ class MusicRepository(
      */
     suspend fun getPlaylistDetails(playlistId: String): NetworkResult<Playlist> = withContext(Dispatchers.IO) {
         try {
-            // Check if this is a local user playlist
+            val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+            if (provider == ContentProvider.YT_MUSIC || playlistId.startsWith("yt_")) {
+                val ytPlaylist = com.example.data.remote.YouTubeMusicProvider.getPlaylistDetails(playlistId)
+                if (ytPlaylist != null && ytPlaylist.songs.isNotEmpty()) {
+                    return@withContext NetworkResult.Success(ytPlaylist)
+                }
+            }
+
+            // 1. Check if this is a Firebase Cloud playlist
+            if (playlistId.startsWith("firebase_")) {
+                val cloudPl = com.example.data.remote.FirebasePlaylistManager.getInstance(context)
+                    .getCachedCloudPlaylist(playlistId)
+                if (cloudPl != null) {
+                    return@withContext NetworkResult.Success(cloudPl)
+                }
+            }
+
+            // 2. Check if this is a local user playlist
             if (playlistId.startsWith("local_")) {
                 val localId = playlistId.removePrefix("local_").toLongOrNull()
                 if (localId != null) {
@@ -322,13 +407,19 @@ class MusicRepository(
                     if (entity != null) {
                         val songs = playlistDao.getSongsForPlaylistSync(localId)
                         val songsMapped = songs.map { it.toSong() }
-                        val firstArt = songsMapped.firstOrNull { it.artwork.isNotBlank() }?.artwork ?: ""
+                        val previews = buildList {
+                            songsMapped.mapNotNull { it.artwork.takeIf { art -> art.isNotBlank() } }.distinct().take(4).forEach { add(it) }
+                            if (entity.artwork.isNotBlank() && !contains(entity.artwork)) add(entity.artwork)
+                        }.take(4)
+                        val firstArt = entity.artwork.ifBlank { previews.firstOrNull() ?: "" }
                         return@withContext NetworkResult.Success(
                             Playlist(
                                 id = playlistId,
                                 title = entity.name,
+                                subtitle = "${songsMapped.size} Songs",
                                 description = entity.description,
                                 artwork = firstArt,
+                                previewArtworks = previews,
                                 songCount = songsMapped.size,
                                 songs = songsMapped
                             )
@@ -399,6 +490,14 @@ class MusicRepository(
      */
     suspend fun getArtistDetails(artistId: String, songLimit: Int = 500, albumLimit: Int = 500): NetworkResult<Artist> = withContext(Dispatchers.IO) {
         try {
+            val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
+            if (provider == ContentProvider.YT_MUSIC || artistId.startsWith("yt_")) {
+                val ytArtist = com.example.data.remote.YouTubeMusicProvider.getArtistDetails(artistId)
+                if (ytArtist != null && ytArtist.topSongs.isNotEmpty()) {
+                    return@withContext NetworkResult.Success(ytArtist)
+                }
+            }
+
             if (artistId.all { it.isDigit() }) {
                 val response = api.getArtistDetails(artistId = artistId, nSong = songLimit, nAlbum = albumLimit, limit = songLimit)
                 if (response.isSuccessful && response.body() != null) {
@@ -670,12 +769,72 @@ class MusicRepository(
     }
 
     /**
-     * Stream URL resolution (with automatic details lookup fallback)
+     * Resilient audio stream fallback: searches title and artist to obtain pristine 320kbps audio.
+     */
+    suspend fun resolveAudioStreamFallback(
+        track: PlayableTrack,
+        quality: StreamUrlResolver.AudioQuality = StreamUrlResolver.AudioQuality.HIGH
+    ): String? = withContext(Dispatchers.IO) {
+        println("[SMusic-Terminal] Resolving audio stream fallback for: '${track.title}' by '${track.artist}' (ID: ${track.id})")
+        val cleanTitle = track.title
+            .replace(Regex("\\[.*?\\]|\\(.*?\\)"), "")
+            .replace(Regex("(?i)ft\\.?|feat\\.?|official|video|audio|lyrics|hd|4k"), "")
+            .trim()
+        val queries = listOf(
+            "$cleanTitle ${track.artist}".trim(),
+            cleanTitle,
+            track.title
+        ).distinct().filter { it.isNotBlank() }
+
+        for (q in queries) {
+            try {
+                println("[SMusic-Terminal] Searching audio match query: '$q'")
+                val searchRes = api.searchSongs(query = q, limit = 5)
+                if (searchRes.isSuccessful && searchRes.body() != null) {
+                    val arr = searchRes.body()!!.getAsJsonArray("results")
+                    if (arr != null && arr.size() > 0) {
+                        val songs = SongMapper.mapList(arr)
+                        val match = songs.firstOrNull { it.encryptedMediaUrl.isNotBlank() } ?: songs.firstOrNull()
+                        if (match != null) {
+                            val matchTrack = match.toPlayableTrack()
+                            val fallbackStream = StreamUrlResolver.resolve(matchTrack, quality)
+                            if (!fallbackStream.isNullOrBlank()) {
+                                println("[SMusic-Terminal-SUCCESS] Audio stream resolved via match '${match.title}': $fallbackStream")
+                                return@withContext fallbackStream
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                println("[SMusic-Terminal-WARN] Fallback search error for query '$q': ${e.message}")
+            }
+        }
+        println("[SMusic-Terminal-ERROR] No fallback audio stream could be resolved for '${track.title}'")
+        null
+    }
+
+    /**
+     * Stream URL resolution (with automatic details lookup and resilient audio engine fallback)
      */
     suspend fun resolveStreamUrl(
         track: PlayableTrack,
         quality: StreamUrlResolver.AudioQuality = StreamUrlResolver.AudioQuality.HIGH
     ): String? = withContext(Dispatchers.IO) {
+        println("[SMusic-Terminal] Starting stream URL resolution for: '${track.title}' (ID: ${track.id}, Source: ${track.source})")
+
+        if (track.id.startsWith("yt_") || track.source == TrackSource.YOUTUBE_MUSIC) {
+            val ytUrl = com.example.data.remote.YouTubeMusicProvider.resolveStreamUrl(track.id)
+            if (!ytUrl.isNullOrBlank()) {
+                println("[SMusic-Terminal-SUCCESS] Resolved direct YouTube Music stream for '${track.title}'")
+                return@withContext ytUrl
+            }
+            println("[SMusic-Terminal] Direct YouTube stream unavailable. Engaging high-fidelity audio stream fallback...")
+            val fallbackUrl = resolveAudioStreamFallback(track, quality)
+            if (!fallbackUrl.isNullOrBlank()) {
+                return@withContext fallbackUrl
+            }
+        }
+
         var resolved = StreamUrlResolver.resolve(track, quality)
         if (resolved.isNullOrBlank() && track.source != TrackSource.LOCAL && track.id.isNotBlank()) {
             // Proactively query song details if track was generated without encrypted media URL
@@ -689,6 +848,16 @@ class MusicRepository(
                 )
                 resolved = StreamUrlResolver.resolve(updatedTrack, quality)
             }
+        }
+
+        if (resolved.isNullOrBlank() && track.source != TrackSource.LOCAL) {
+            resolved = resolveAudioStreamFallback(track, quality)
+        }
+
+        if (resolved != null) {
+            println("[SMusic-Terminal-SUCCESS] Final resolved stream URL for '${track.title}': $resolved")
+        } else {
+            println("[SMusic-Terminal-ERROR] Failed to resolve any stream URL for '${track.title}' (ID: ${track.id})")
         }
         resolved
     }
@@ -798,9 +967,17 @@ class MusicRepository(
             val songsByPlaylist = allSongs.groupBy { it.playlistId }
             playlists.map { playlist ->
                 val songs = songsByPlaylist[playlist.id] ?: emptyList()
-                val previews = songs.mapNotNull { it.artwork.takeIf { art -> art.isNotBlank() } }
-                    .distinct()
-                    .take(4)
+                val previews = buildList {
+                    songs.mapNotNull { it.artwork.takeIf { art -> art.isNotBlank() } }
+                        .map { com.example.data.remote.JioSaavnImageResolver.resolve(it, 500).ifBlank { it } }
+                        .distinct()
+                        .take(4)
+                        .forEach { add(it) }
+                    if (playlist.artwork.isNotBlank()) {
+                        val resolved = com.example.data.remote.JioSaavnImageResolver.resolve(playlist.artwork, 500).ifBlank { playlist.artwork }
+                        if (!contains(resolved)) add(resolved)
+                    }
+                }.take(4)
                 com.example.data.model.UserPlaylistSummary(
                     id = playlist.id,
                     name = playlist.name,
@@ -812,13 +989,16 @@ class MusicRepository(
             }
         }.flowOn(Dispatchers.IO)
 
-    suspend fun createPlaylist(name: String, description: String = ""): Long = withContext(Dispatchers.IO) {
-        playlistDao.insertPlaylist(PlaylistEntity(name = name, description = description))
+    suspend fun createPlaylist(name: String, description: String = "", artwork: String = ""): Long = withContext(Dispatchers.IO) {
+        val id = playlistDao.insertPlaylist(PlaylistEntity(name = name, description = description, artwork = artwork))
+        syncLocalPlaylistToFirebase(id, notifyUser = false)
+        id
     }
 
     suspend fun deletePlaylist(id: Long) = withContext(Dispatchers.IO) {
         playlistDao.deletePlaylist(id)
         playlistDao.deleteSongsByPlaylist(id)
+        com.example.data.remote.FirebasePlaylistManager.getInstance(context).deleteCloudPlaylist("local_$id")
     }
 
     fun getPlaylistSongs(playlistId: Long): Flow<List<PlayableTrack>> =
@@ -841,19 +1021,73 @@ class MusicRepository(
                 encryptedMediaUrl = track.encryptedMediaUrl
             )
         )
+        syncLocalPlaylistToFirebase(playlistId, notifyUser = false)
     }
 
     suspend fun removeSongFromPlaylist(playlistId: Long, songId: String) = withContext(Dispatchers.IO) {
         playlistDao.removeSongFromPlaylist(playlistId, songId)
+        syncLocalPlaylistToFirebase(playlistId, notifyUser = false)
+    }
+
+    suspend fun syncLocalPlaylistToFirebase(playlistId: Long, notifyUser: Boolean = true) = withContext(Dispatchers.IO) {
+        val entity = playlistDao.getPlaylistById(playlistId) ?: return@withContext
+        val songs = playlistDao.getSongsForPlaylistSync(playlistId).map { it.toSong() }
+        val previews = buildList {
+            songs.mapNotNull { it.artwork.takeIf { art -> art.isNotBlank() } }.distinct().take(4).forEach { add(it) }
+            if (entity.artwork.isNotBlank() && !contains(entity.artwork)) add(entity.artwork)
+        }.take(4)
+        val cloudPl = Playlist(
+            id = "local_${entity.id}",
+            title = entity.name.ifBlank { "SMusic Playlist" },
+            subtitle = "${songs.size} Songs",
+            description = entity.description,
+            artwork = entity.artwork.ifBlank { previews.firstOrNull() ?: "" },
+            previewArtworks = previews,
+            songCount = songs.size,
+            songs = songs,
+            isCloudSynced = true
+        )
+        com.example.data.remote.FirebasePlaylistManager.getInstance(context)
+            .syncPlaylistToCloud(cloudPl, notifyUser = notifyUser)
+    }
+
+    suspend fun syncAllPlaylistsToFirebase(): Int = syncAllLocalPlaylistsToFirebase()
+
+    suspend fun syncAllLocalPlaylistsToFirebase(): Int = withContext(Dispatchers.IO) {
+        val allLocal = playlistDao.getAllPlaylists().firstOrNull() ?: emptyList()
+        var syncedCount = 0
+        for (entity in allLocal) {
+            syncLocalPlaylistToFirebase(entity.id, notifyUser = false)
+            syncedCount++
+        }
+        // If user has no local playlists yet, also sync top playlists from cached shelves so Firebase has playlists
+        if (syncedCount == 0 && cachedShelves.isNotEmpty()) {
+            val topPl = cachedShelves
+                .flatMap { it.items }
+                .mapNotNull { (it as? ShelfItem.PlaylistItem)?.playlist }
+                .take(4)
+            for (pl in topPl) {
+                val ok = com.example.data.remote.FirebasePlaylistManager.getInstance(context)
+                    .syncPlaylistToCloud(pl, notifyUser = false)
+                if (ok) syncedCount++
+            }
+        }
+        syncedCount
     }
 
     /**
-     * Import a JioSaavn playlist into user's local Room playlists
+     * Import a JioSaavn playlist into user's local Room playlists and Firebase Cloud
      */
     suspend fun importJioSaavnPlaylistToLocal(playlist: Playlist): Long = withContext(Dispatchers.IO) {
-        val playlistId = createPlaylist(
-            name = playlist.title.ifBlank { "smusic playlist" },
-            description = playlist.description.ifBlank { "Imported from JioSaavn (${playlist.songs.size} tracks)" }
+        val primaryArt = playlist.artwork.ifBlank {
+            playlist.songs.firstOrNull { it.artwork.isNotBlank() }?.artwork ?: ""
+        }
+        val playlistId = playlistDao.insertPlaylist(
+            PlaylistEntity(
+                name = playlist.title.ifBlank { "SMusic Playlist" },
+                description = playlist.description.ifBlank { "Imported from JioSaavn (${playlist.songs.size} tracks)" },
+                artwork = primaryArt
+            )
         )
         val entities = playlist.songs.map { song ->
             PlaylistSongEntity(
@@ -872,6 +1106,15 @@ class MusicRepository(
         if (entities.isNotEmpty()) {
             playlistDao.insertPlaylistSongs(entities)
         }
+        // Notify & sync to Firebase Cloud if signed in
+        com.example.player.SMusicNotificationHelper.showPlaylistSyncNotification(
+            context = context,
+            playlistId = "local_$playlistId",
+            playlistTitle = playlist.title.ifBlank { "SMusic Playlist" },
+            songCount = playlist.songs.size,
+            artworkUrl = primaryArt
+        )
+        syncLocalPlaylistToFirebase(playlistId, notifyUser = false)
         playlistId
     }
 

@@ -191,12 +191,6 @@ class MusicPlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        mediaSession = MediaSession.Builder(this, forwardingPlayer)
-            .setSessionActivity(sessionActivityIntent)
-            .setBitmapLoader(CoilMediaBitmapLoader())
-            .setCallback(ServiceSessionCallback())
-            .build()
-
         // Configure Media3 Notification Provider with crisp monochrome icon and full lockscreen visibility
         val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
             .setChannelId(CHANNEL_ID)
@@ -207,14 +201,51 @@ class MusicPlaybackService : MediaSessionService() {
             }
         setMediaNotificationProvider(notificationProvider)
 
+        val builtSession = MediaSession.Builder(this, forwardingPlayer)
+            .setSessionActivity(sessionActivityIntent)
+            .setBitmapLoader(CoilMediaBitmapLoader())
+            .setCallback(ServiceSessionCallback())
+            .build()
+        mediaSession = builtSession
+        try {
+            addSession(builtSession)
+        } catch (_: Exception) {}
+
         // Observe current track like state to keep Lockscreen & Notification heart icon in sync
         serviceScope.launch {
             playerManager.isCurrentTrackLiked.collectLatest { isLiked ->
                 updateCustomHeartButton(isLiked)
+                syncMediaNotification()
+            }
+        }
+
+        // Observe track, playing state, buffering, and duration so Notification always stays in sync
+        serviceScope.launch {
+            kotlinx.coroutines.flow.combine(
+                playerManager.currentTrack,
+                playerManager.isPlaying,
+                playerManager.isBuffering,
+                playerManager.durationMs
+            ) { track, playing, buffering, _ ->
+                Triple(track, playing, buffering)
+            }.collectLatest { (track, playing, buffering) ->
+                if (track != null) {
+                    syncMediaNotification(forceForeground = playing || buffering)
+                }
             }
         }
 
         registerBecomingNoisy()
+    }
+
+    fun syncMediaNotification(forceForeground: Boolean? = null) {
+        val session = mediaSession ?: return
+        val pm = PlayerManager.getInstance(applicationContext)
+        if (pm.currentTrack.value == null) return
+        val foreground = forceForeground ?: (pm.isPlaying.value || pm.isBuffering.value)
+        try {
+            onUpdateNotification(session, foreground)
+        } catch (_: Exception) {}
     }
 
     fun updateCustomHeartButton(isLiked: Boolean) {
@@ -227,25 +258,13 @@ class MusicPlaybackService : MediaSessionService() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "SMusic Playback",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Media playback controls and lockscreen player"
-                setShowBadge(false)
-                setSound(null, null)
-                enableVibration(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager?.createNotificationChannel(channel)
-        }
+        SMusicNotificationHelper.ensureChannelsCreated(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return super.onStartCommand(intent, flags, startId)
+        val result = super.onStartCommand(intent, flags, startId)
+        syncMediaNotification()
+        return result
     }
 
     private fun registerBecomingNoisy() {
@@ -360,8 +379,10 @@ class MusicPlaybackService : MediaSessionService() {
             val future = SettableFuture.create<Bitmap>()
             serviceScope.launch(Dispatchers.IO) {
                 try {
+                    val rawStr = uri.toString()
+                    val resolvedStr = com.example.data.remote.JioSaavnImageResolver.resolve(rawStr, 500).ifBlank { rawStr }
                     val request = ImageRequest.Builder(applicationContext)
-                        .data(uri)
+                        .data(resolvedStr)
                         .size(512, 512)
                         .allowHardware(false)
                         .build()

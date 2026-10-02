@@ -373,68 +373,157 @@ fun PlaylistCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val cleanArtworks = remember(playlist.previewArtworks, playlist.artwork) {
+        buildList {
+            playlist.previewArtworks
+                .map { com.example.data.remote.JioSaavnImageResolver.resolve(it, 500).ifBlank { it } }
+                .filter { it.isNotBlank() }
+                .forEach { add(it) }
+            if (playlist.artwork.isNotBlank()) {
+                val resolved = com.example.data.remote.JioSaavnImageResolver.resolve(playlist.artwork, 500).ifBlank { playlist.artwork }
+                if (!contains(resolved)) add(0, resolved)
+            }
+        }.distinct()
+    }
+
+    val displayTitle = remember(playlist.title) {
+        playlist.title.trim().ifBlank { "SMusic Playlist" }
+    }
+    val displaySubtitle = remember(playlist.subtitle, playlist.songCount) {
+        playlist.subtitle.trim().ifBlank {
+            if (playlist.songCount > 0) "${playlist.songCount} Songs" else "Playlist"
+        }
+    }
+
     Column(
         modifier = modifier
-            .width(140.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .width(148.dp)
+            .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .testTag("playlist_card_${playlist.id}")
-            .padding(2.dp)
+            .padding(3.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(136.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(142.dp)
+                .clip(RoundedCornerShape(18.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center
         ) {
-            if (playlist.artwork.isNotBlank()) {
-                AsyncImage(
-                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                        .data(playlist.artwork)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = playlist.title,
+            if (cleanArtworks.size >= 2) {
+                FourSongGridCover(
+                    artworks = cleanArtworks,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    cornerRadius = 18.dp,
+                    fallbackTitle = displayTitle
                 )
-            } else {
+            } else if (cleanArtworks.isNotEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                )
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.QueueMusic,
-                        contentDescription = playlist.title,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.size(42.dp)
+                    )
+                    AsyncImage(
+                        model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                            .data(cleanArtworks.first())
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = displayTitle,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.colorScheme.tertiaryContainer
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QueueMusic,
+                        contentDescription = displayTitle,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(46.dp)
                     )
                 }
             }
+
+            if (playlist.isCloudSynced) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.65f),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(24.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDone,
+                            contentDescription = "Firebase Cloud Synced",
+                            tint = Color(0xFF38BDF8),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
         }
+
         Spacer(modifier = Modifier.height(8.dp))
+
+        // Playlist Title rendered clearly below artwork (sabse niche)
         Text(
-            text = playlist.title,
+            text = displayTitle,
+            fontFamily = AppFontFamily,
+            fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleSmall.copy(
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 13.5.sp
+                fontSize = 13.8.sp,
+                lineHeight = 17.sp
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 2.dp)
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        Text(
+            text = displaySubtitle,
+            fontFamily = AppFontFamily,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = AppFontFamily,
+                fontSize = 11.5.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface
+            modifier = Modifier.padding(horizontal = 2.dp)
         )
-        if (playlist.subtitle.isNotBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = playlist.subtitle,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
     }
 }
 

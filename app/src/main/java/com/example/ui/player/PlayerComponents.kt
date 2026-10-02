@@ -106,6 +106,7 @@ import kotlin.math.sin
  * Dynamic Palette extracted from Song Artwork
  */
 data class DynamicSongColors(
+    val seedColor: Color,
     val primary: Color,
     val secondary: Color,
     val tertiary: Color,
@@ -156,7 +157,7 @@ fun rememberDynamicSongColors(
                 if (result is SuccessResult) {
                     val bitmap = result.drawable.toBitmap(96, 96, Bitmap.Config.ARGB_8888)
                     val sampledColors = mutableListOf<Int>()
-                    val step = 8
+                    val step = 6
                     for (x in 0 until bitmap.width step step) {
                         for (y in 0 until bitmap.height step step) {
                             val pixel = bitmap.getPixel(x, y)
@@ -168,14 +169,14 @@ fun rememberDynamicSongColors(
                     }
 
                     if (sampledColors.isNotEmpty()) {
-                        // Find vibrant saturated colors
+                        // Find vibrant saturated colors with balanced luminance
                         val hsv = FloatArray(3)
                         val scoredColors = sampledColors.map { c ->
                             android.graphics.Color.colorToHSV(c, hsv)
                             val saturation = hsv[1]
                             val brightness = hsv[2]
-                            // Score based on saturation and balanced brightness
-                            val score = saturation * 2f + (if (brightness in 0.3f..0.85f) 1f else 0.2f)
+                            // Score based on saturation and optimal Material Design luminance
+                            val score = saturation * 2.5f + (if (brightness in 0.35f..0.85f) 1.2f else 0.3f)
                             c to score
                         }.sortedByDescending { it.second }
 
@@ -194,12 +195,27 @@ fun rememberDynamicSongColors(
         }
     }
 
-    val basePrimary = extractedPrimary ?: if (isDark) Color(0xFF6EE7B7) else Color(0xFF006C4C)
-    val baseSecondary = extractedSecondary ?: if (isDark) Color(0xFF93C5FD) else Color(0xFF1E6586)
+    val fallbackPrimary = remember(defaultHue, isDark) {
+        com.example.ui.theme.MaterialYouPaletteGenerator.hslToColor(
+            defaultHue,
+            0.65f,
+            if (isDark) 0.65f else 0.45f
+        )
+    }
+    val fallbackSecondary = remember(defaultHue, isDark) {
+        com.example.ui.theme.MaterialYouPaletteGenerator.hslToColor(
+            (defaultHue + 40f) % 360f,
+            0.45f,
+            if (isDark) 0.65f else 0.45f
+        )
+    }
+
+    val basePrimary = extractedPrimary ?: fallbackPrimary
+    val baseSecondary = extractedSecondary ?: fallbackSecondary
 
     // Smoothly animate the colors when song changes
-    val animPrimary by animateColorAsState(basePrimary, animationSpec = tween(700), label = "prim")
-    val animSecondary by animateColorAsState(baseSecondary, animationSpec = tween(700), label = "sec")
+    val animPrimary by animateColorAsState(basePrimary, animationSpec = tween(650), label = "prim")
+    val animSecondary by animateColorAsState(baseSecondary, animationSpec = tween(650), label = "sec")
 
     val bgTop = if (isDark) {
         animPrimary.copy(alpha = 0.38f)
@@ -216,6 +232,7 @@ fun rememberDynamicSongColors(
     val onSurfVar = if (isDark) Color(0xFFA8B4AD) else Color(0xFF53635B)
 
     return DynamicSongColors(
+        seedColor = basePrimary,
         primary = animPrimary,
         secondary = animSecondary,
         tertiary = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706),

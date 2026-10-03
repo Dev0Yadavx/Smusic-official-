@@ -452,7 +452,7 @@ fun SearchScreen(
                                     contentPadding = PaddingValues(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(searchHistory.take(8)) { term ->
+                                    items(searchHistory.take(8), key = { "hist_$it" }) { term ->
                                         Surface(
                                             shape = RoundedCornerShape(16.dp),
                                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -502,7 +502,7 @@ fun SearchScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                items(trendingPillsRow1) { tag ->
+                                items(trendingPillsRow1, key = { "trend1_$it" }) { tag ->
                                     TrendingPillChip(tag = tag, onClick = {
                                         viewModel.submitSearch(tag.removePrefix("🔥 "))
                                         focusManager.clearFocus()
@@ -518,7 +518,7 @@ fun SearchScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                items(trendingPillsRow2) { tag ->
+                                items(trendingPillsRow2, key = { "trend2_$it" }) { tag ->
                                     TrendingPillChip(tag = tag, onClick = {
                                         viewModel.submitSearch(tag.removePrefix("🔥 "))
                                         focusManager.clearFocus()

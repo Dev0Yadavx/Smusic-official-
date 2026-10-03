@@ -83,7 +83,7 @@ fun ExpressiveSplashScreen(
     val centerIconScale = remember { Animatable(0f) }
     val progressValue = remember { Animatable(0f) }
 
-    // 5 Seconds splash duration
+    // Snappy, smooth 1.2 seconds splash duration with tap-to-skip support
     LaunchedEffect(Unit) {
         launch {
             outerBadgeScale.animateTo(
@@ -94,7 +94,7 @@ fun ExpressiveSplashScreen(
                 )
             )
         }
-        delay(120)
+        delay(80)
         launch {
             innerCookieScale.animateTo(
                 targetValue = 1f,
@@ -104,7 +104,7 @@ fun ExpressiveSplashScreen(
                 )
             )
         }
-        delay(100)
+        delay(60)
         launch {
             centerIconScale.animateTo(
                 targetValue = 1f,
@@ -115,17 +115,17 @@ fun ExpressiveSplashScreen(
             )
         }
         showBranding = true
-        delay(150)
+        delay(80)
         showBottomProgress = true
 
-        // Progress smoothly fills over 5 seconds (5,000 ms)
+        // Progress smoothly fills over 1.2 seconds (1,200 ms)
         launch {
             progressValue.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+                animationSpec = tween(durationMillis = 1100, easing = LinearEasing)
             )
         }
-        delay(5000)
+        delay(1200)
         onSplashFinished()
     }
 

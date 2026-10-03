@@ -1,12 +1,16 @@
 package com.example.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.data.model.PlayableTrack
 import com.example.data.model.Song
 import com.example.data.model.TrackSource
 
-@Entity(tableName = "liked_songs")
+@Entity(
+    tableName = "liked_songs",
+    indices = [Index(value = ["addedAt"])]
+)
 data class LikedSongEntity(
     @PrimaryKey val id: String,
     val title: String,
@@ -48,7 +52,10 @@ data class LikedSongEntity(
     )
 }
 
-@Entity(tableName = "recently_played")
+@Entity(
+    tableName = "recently_played",
+    indices = [Index(value = ["songId"]), Index(value = ["playedAt"])]
+)
 data class RecentlyPlayedEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val songId: String,
@@ -99,7 +106,10 @@ data class PlaylistEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "playlist_songs")
+@Entity(
+    tableName = "playlist_songs",
+    indices = [Index(value = ["playlistId"]), Index(value = ["songId"])]
+)
 data class PlaylistSongEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val playlistId: Long,
@@ -139,14 +149,20 @@ data class PlaylistSongEntity(
     )
 }
 
-@Entity(tableName = "search_history")
+@Entity(
+    tableName = "search_history",
+    indices = [Index(value = ["query"], unique = true), Index(value = ["timestamp"])]
+)
 data class SearchHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val query: String,
     val timestamp: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "downloaded_songs")
+@Entity(
+    tableName = "downloaded_songs",
+    indices = [Index(value = ["downloadedAt"])]
+)
 data class DownloadedSongEntity(
     @PrimaryKey val id: String,
     val title: String,

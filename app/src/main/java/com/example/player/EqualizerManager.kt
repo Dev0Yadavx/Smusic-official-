@@ -77,14 +77,7 @@ class EqualizerManager private constructor(context: Context) {
     val bassBoostStrength: StateFlow<Int> = _bassBoostStrength.asStateFlow()
 
     init {
-        val initialSession = try {
-            audioManager.generateAudioSessionId()
-        } catch (_: Exception) {
-            0
-        }
-        if (initialSession > 0) {
-            bindToAudioSession(initialSession)
-        }
+        // Effects will be safely bound when player initializes a real audio session
     }
 
     private fun loadSavedBands(): List<Int> {

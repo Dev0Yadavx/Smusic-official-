@@ -177,7 +177,7 @@ class ThemeManager private constructor(context: Context) {
     val userAvatarImageUri: StateFlow<String?> = _userAvatarImageUri.asStateFlow()
 
     private val _hasAgreedPermissions = MutableStateFlow(
-        prefs.getBoolean(KEY_HAS_AGREED_PERMISSIONS, false)
+        prefs.getBoolean(KEY_HAS_AGREED_PERMISSIONS, true)
     )
     val hasAgreedPermissions: StateFlow<Boolean> = _hasAgreedPermissions.asStateFlow()
 

@@ -1,5 +1,6 @@
 package com.example.data.remote
 
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -8,7 +9,10 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
     private const val BASE_URL = "https://www.jiosaavn.com/"
 
+    private val connectionPool = ConnectionPool(8, 5, TimeUnit.MINUTES)
+
     private val okHttpClient = OkHttpClient.Builder()
+        .connectionPool(connectionPool)
         .addInterceptor { chain ->
             val request = chain.request().newBuilder()
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -19,9 +23,9 @@ object RetrofitClient {
                 .build()
             chain.proceed(request)
         }
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .writeTimeout(12, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
 

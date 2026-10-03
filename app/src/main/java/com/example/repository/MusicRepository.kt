@@ -57,22 +57,93 @@ class MusicRepository(
             val response = api.getLaunchData(languages = languages)
             if (response.isSuccessful && response.body() != null) {
                 val shelves = HomeMapper.map(response.body()!!)
-                cachedShelves = shelves
-                emit(NetworkResult.Success(shelves))
+                if (shelves.isNotEmpty()) {
+                    cachedShelves = shelves
+                    emit(NetworkResult.Success(shelves))
+                } else if (cachedShelves.isNotEmpty()) {
+                    emit(NetworkResult.Success(cachedShelves))
+                } else {
+                    val fallback = loadFallbackTrendingShelves()
+                    if (fallback.isNotEmpty()) {
+                        cachedShelves = fallback
+                        emit(NetworkResult.Success(fallback))
+                    } else {
+                        emit(NetworkResult.Error("No music shelves found"))
+                    }
+                }
             } else {
-                if (cachedShelves.isEmpty()) {
-                    emit(NetworkResult.Error("Failed to load music: ${response.code()} ${response.message()}"))
+                if (cachedShelves.isNotEmpty()) {
+                    emit(NetworkResult.Success(cachedShelves))
+                } else {
+                    val fallback = loadFallbackTrendingShelves()
+                    if (fallback.isNotEmpty()) {
+                        cachedShelves = fallback
+                        emit(NetworkResult.Success(fallback))
+                    } else {
+                        emit(NetworkResult.Error("Failed to load music: ${response.code()} ${response.message()}"))
+                    }
                 }
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(tag, "Home content error: ${e.message}", e)
-            if (cachedShelves.isEmpty()) {
-                emit(NetworkResult.Error("Unable to connect to music service. Please check your internet connection.", e))
+            if (cachedShelves.isNotEmpty()) {
+                emit(NetworkResult.Success(cachedShelves))
+            } else {
+                val fallback = loadFallbackTrendingShelves()
+                if (fallback.isNotEmpty()) {
+                    cachedShelves = fallback
+                    emit(NetworkResult.Success(fallback))
+                } else {
+                    emit(NetworkResult.Error("Unable to connect to music service. Please check your internet connection.", e))
+                }
             }
         }
     }.flowOn(Dispatchers.IO)
+
+    private suspend fun loadFallbackTrendingShelves(): List<MusicShelf> {
+        val shelves = mutableListOf<MusicShelf>()
+        try {
+            val trendingRes = api.searchSongs(query = "Trending", page = 1, limit = 20)
+            if (trendingRes.isSuccessful && trendingRes.body() != null) {
+                val arr = trendingRes.body()!!.getAsJsonArray("results")
+                val songs = SongMapper.mapList(arr)
+                if (songs.isNotEmpty()) {
+                    shelves.add(
+                        MusicShelf(
+                            id = "fallback_trending",
+                            title = "Trending Now",
+                            subtitle = "Popular tracks for you",
+                            type = ShelfType.SONG_HORIZONTAL,
+                            items = songs.map { ShelfItem.SongItem(it) }
+                        )
+                    )
+                }
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            val topHitsRes = api.searchSongs(query = "Top Hits", page = 1, limit = 20)
+            if (topHitsRes.isSuccessful && topHitsRes.body() != null) {
+                val arr = topHitsRes.body()!!.getAsJsonArray("results")
+                val songs = SongMapper.mapList(arr)
+                if (songs.isNotEmpty()) {
+                    shelves.add(
+                        MusicShelf(
+                            id = "fallback_top_hits",
+                            title = "Top Hits",
+                            subtitle = "Chart toppers & favorites",
+                            type = ShelfType.SONG_HORIZONTAL,
+                            items = songs.map { ShelfItem.SongItem(it) }
+                        )
+                    )
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return shelves
+    }
 
     /**
      * Search songs

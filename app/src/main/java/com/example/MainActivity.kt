@@ -99,9 +99,27 @@ class MainActivity : ComponentActivity() {
     private val searchViewModel: SearchViewModel by viewModels()
     private val libraryViewModel: LibraryViewModel by viewModels()
 
+    private fun enableHighRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val currentDisplay = display ?: return
+                val supportedModes = currentDisplay.supportedModes ?: return
+                val highestRefreshRateMode = supportedModes.maxByOrNull { it.refreshRate }
+                if (highestRefreshRateMode != null && highestRefreshRateMode.refreshRate > 60f) {
+                    val layoutParams = window?.attributes
+                    if (layoutParams != null) {
+                        layoutParams.preferredDisplayModeId = highestRefreshRateMode.modeId
+                        window.attributes = layoutParams
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        enableHighRefreshRate()
 
         val playerManager = PlayerManager.getInstance(applicationContext)
         val repository = MusicRepository(applicationContext)

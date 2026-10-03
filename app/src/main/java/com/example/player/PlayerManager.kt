@@ -391,7 +391,7 @@ class PlayerManager private constructor(private val appContext: Context) {
         try {
             val intent = Intent(appContext, MusicPlaybackService::class.java)
             appContext.startService(intent)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(tag, "Service start deferred: ${e.message}")
         }
         try {
@@ -402,7 +402,7 @@ class PlayerManager private constructor(private val appContext: Context) {
                 )
                 mediaControllerFuture = MediaController.Builder(appContext, sessionToken).buildAsync()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(tag, "MediaController connection deferred: ${e.message}")
         }
     }

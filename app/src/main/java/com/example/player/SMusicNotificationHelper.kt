@@ -50,48 +50,50 @@ object SMusicNotificationHelper {
     }
 
     fun ensureChannelsCreated(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val manager = context.getSystemService(NotificationManager::class.java) ?: return
 
-            val playbackChannel = NotificationChannel(
-                CHANNEL_PLAYBACK,
-                "SMusic Playback",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Media playback controls, lockscreen player, and song artwork"
-                setShowBadge(false)
-                setSound(null, null)
-                enableVibration(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                val playbackChannel = NotificationChannel(
+                    CHANNEL_PLAYBACK,
+                    "SMusic Playback",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Media playback controls, lockscreen player, and song artwork"
+                    setShowBadge(false)
+                    setSound(null, null)
+                    enableVibration(false)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+
+                val downloadChannel = NotificationChannel(
+                    CHANNEL_DOWNLOADS,
+                    "SMusic Downloads",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Offline song download progress and completion alerts"
+                    setShowBadge(true)
+                    setSound(null, null)
+                    enableVibration(false)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+
+                val cloudChannel = NotificationChannel(
+                    CHANNEL_CLOUD_SYNC,
+                    "Playlists & Library",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Playlist updates and library alerts"
+                    setShowBadge(true)
+                    enableVibration(true)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+
+                manager.createNotificationChannels(
+                    listOf(playbackChannel, downloadChannel, cloudChannel)
+                )
             }
-
-            val downloadChannel = NotificationChannel(
-                CHANNEL_DOWNLOADS,
-                "SMusic Downloads",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Offline song download progress and completion alerts"
-                setShowBadge(true)
-                setSound(null, null)
-                enableVibration(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-
-            val cloudChannel = NotificationChannel(
-                CHANNEL_CLOUD_SYNC,
-                "Playlists & Library",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Playlist updates and library alerts"
-                setShowBadge(true)
-                enableVibration(true)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-
-            manager.createNotificationChannels(
-                listOf(playbackChannel, downloadChannel, cloudChannel)
-            )
-        }
+        } catch (_: Throwable) {}
     }
 
     private fun buildLaunchPendingIntent(context: Context): PendingIntent {

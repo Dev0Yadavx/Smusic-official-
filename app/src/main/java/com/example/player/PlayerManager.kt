@@ -601,6 +601,7 @@ class PlayerManager private constructor(private val appContext: Context) {
         _currentTrack.value = updatedTrack
         currentArtworkBytes = null
         refreshCurrentTrackLikeState(updatedTrack.id)
+        savePlaybackState()
 
         ensureServiceStarted()
         updateMediaItemMetadata(updatedTrack, localArtwork, null)
@@ -1031,6 +1032,7 @@ class PlayerManager private constructor(private val appContext: Context) {
             } catch (_: Exception) {}
         }
         invalidateSessionState()
+        savePlaybackState()
     }
 
     fun resume() {
@@ -1187,6 +1189,7 @@ class PlayerManager private constructor(private val appContext: Context) {
     }
 
     fun clearQueue() {
+        clearSavedPlaybackState()
         _queue.value = emptyList()
         _currentIndex.value = -1
         _currentTrack.value = null
@@ -1218,6 +1221,152 @@ class PlayerManager private constructor(private val appContext: Context) {
             mediaPlayer?.setVolume(clamped, clamped)
         } catch (_: Exception) {}
         invalidateSessionState()
+    }
+
+    private val prefs by lazy {
+        appContext.getSharedPreferences("smusic_playback_state", Context.MODE_PRIVATE)
+    }
+
+    init {
+        restorePlaybackState()
+    }
+
+    fun savePlaybackState() {
+        val track = _currentTrack.value ?: return
+        try {
+            prefs.edit().apply {
+                putString("track_id", track.id)
+                putString("track_title", track.title)
+                putString("track_artist", track.artist)
+                putString("track_album", track.album)
+                putString("track_album_id", track.albumId)
+                putString("track_artwork", track.artwork)
+                putLong("track_duration", track.duration)
+                putString("track_stream_url", track.streamUrl)
+                putString("track_lyrics_id", track.lyricsId)
+                putString("track_lyrics_snippet", track.lyricsSnippet)
+                putString("track_source", track.source.name)
+                putString("track_local_path", track.localFilePath)
+                putLong("track_position_ms", _currentPositionMs.value)
+                putInt("queue_index", _currentIndex.value)
+                putInt("queue_size", _queue.value.size)
+                putString("queue_json", serializeQueue(_queue.value.take(40)))
+                apply()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun restorePlaybackState() {
+        try {
+            val trackId = prefs.getString("track_id", null) ?: return
+            val title = prefs.getString("track_title", "") ?: ""
+            val artist = prefs.getString("track_artist", "") ?: ""
+            if (title.isBlank()) return
+            val album = prefs.getString("track_album", "") ?: ""
+            val albumId = prefs.getString("track_album_id", "") ?: ""
+            val artwork = prefs.getString("track_artwork", "") ?: ""
+            val duration = prefs.getLong("track_duration", 0L)
+            val streamUrl = prefs.getString("track_stream_url", "") ?: ""
+            val lyricsId = prefs.getString("track_lyrics_id", "") ?: ""
+            val lyricsSnippet = prefs.getString("track_lyrics_snippet", "") ?: ""
+            val sourceName = prefs.getString("track_source", com.example.data.model.TrackSource.JIOSAAVN.name)
+                ?: com.example.data.model.TrackSource.JIOSAAVN.name
+            val localPath = prefs.getString("track_local_path", "") ?: ""
+            val source = try { com.example.data.model.TrackSource.valueOf(sourceName) } catch (_: Exception) { com.example.data.model.TrackSource.JIOSAAVN }
+            val savedPos = prefs.getLong("track_position_ms", 0L)
+            val savedIndex = prefs.getInt("queue_index", 0)
+
+            val restoredTrack = PlayableTrack(
+                id = trackId,
+                title = title,
+                artist = artist,
+                album = album,
+                albumId = albumId,
+                artwork = artwork,
+                duration = duration,
+                streamUrl = streamUrl,
+                lyricsId = lyricsId,
+                lyricsSnippet = lyricsSnippet,
+                source = source,
+                localFilePath = localPath
+            )
+
+            val queueJson = prefs.getString("queue_json", null)
+            val restoredQueue = if (!queueJson.isNullOrBlank()) {
+                deserializeQueue(queueJson)
+            } else {
+                listOf(restoredTrack)
+            }
+
+            _currentTrack.value = restoredTrack
+            _queue.value = if (restoredQueue.isNotEmpty()) restoredQueue else listOf(restoredTrack)
+            _currentIndex.value = savedIndex.coerceIn(0, (_queue.value.size - 1).coerceAtLeast(0))
+            _currentPositionMs.value = savedPos
+            _durationMs.value = if (duration > 0) duration * 1000L else 0L
+            _isPlaying.value = false
+            currentPlaybackState = Player.STATE_IDLE
+            refreshCurrentTrackLikeState(trackId)
+            updateMediaItemMetadata(restoredTrack, restoredTrack.artwork, null)
+        } catch (_: Exception) {}
+    }
+
+    fun clearSavedPlaybackState() {
+        try {
+            prefs.edit().clear().apply()
+        } catch (_: Exception) {}
+    }
+
+    private fun serializeQueue(tracks: List<PlayableTrack>): String {
+        return try {
+            val array = org.json.JSONArray()
+            for (t in tracks) {
+                val obj = org.json.JSONObject().apply {
+                    put("id", t.id)
+                    put("title", t.title)
+                    put("artist", t.artist)
+                    put("album", t.album)
+                    put("albumId", t.albumId)
+                    put("artwork", t.artwork)
+                    put("duration", t.duration)
+                    put("streamUrl", t.streamUrl)
+                    put("lyricsId", t.lyricsId)
+                    put("source", t.source.name)
+                    put("localFilePath", t.localFilePath)
+                }
+                array.put(obj)
+            }
+            array.toString()
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun deserializeQueue(json: String): List<PlayableTrack> {
+        val list = mutableListOf<PlayableTrack>()
+        try {
+            val array = org.json.JSONArray(json)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val sourceName = obj.optString("source", com.example.data.model.TrackSource.JIOSAAVN.name)
+                val src = try { com.example.data.model.TrackSource.valueOf(sourceName) } catch (_: Exception) { com.example.data.model.TrackSource.JIOSAAVN }
+                list.add(
+                    PlayableTrack(
+                        id = obj.getString("id"),
+                        title = obj.getString("title"),
+                        artist = obj.getString("artist"),
+                        album = obj.optString("album", ""),
+                        albumId = obj.optString("albumId", ""),
+                        artwork = obj.optString("artwork", ""),
+                        duration = obj.optLong("duration", 0L),
+                        streamUrl = obj.optString("streamUrl", ""),
+                        lyricsId = obj.optString("lyricsId", ""),
+                        source = src,
+                        localFilePath = obj.optString("localFilePath", "")
+                    )
+                )
+            }
+        } catch (_: Exception) {}
+        return list
     }
 
     companion object {

@@ -145,8 +145,8 @@ class MainActivity : ComponentActivity() {
                 songPrimaryColor = dynamicSongColors?.primary,
                 songSecondaryColor = dynamicSongColors?.secondary
             ) {
-                var showSplash by rememberSaveable { mutableStateOf(true) }
-                var isMainContentReady by rememberSaveable { mutableStateOf(false) }
+                var showSplash by rememberSaveable { mutableStateOf(!SMusicApplication.hasShownSplashThisSession) }
+                var isMainContentReady by rememberSaveable { mutableStateOf(SMusicApplication.hasShownSplashThisSession) }
 
                 val notifPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
@@ -382,7 +382,10 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize()
                     ) {
                         ExpressiveSplashScreen(
-                            onSplashFinished = { showSplash = false }
+                            onSplashFinished = {
+                                SMusicApplication.hasShownSplashThisSession = true
+                                showSplash = false
+                            }
                         )
                     }
                 }

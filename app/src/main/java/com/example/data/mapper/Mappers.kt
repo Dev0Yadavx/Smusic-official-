@@ -362,102 +362,122 @@ object HomeMapper {
             return if (!title.isNullOrBlank()) JioSaavnImageResolver.unescapeHtml(title) else fallback
         }
 
-        // 1. Trending
-        val trendingArr = json.getAsJsonArray("new_trending")
-        if (trendingArr != null && trendingArr.size() > 0) {
-            val items = mutableListOf<ShelfItem>()
-            for (i in 0 until trendingArr.size()) {
-                val item = trendingArr.get(i).asJsonObject
-                val type = item.get("type")?.asString
-                if (type == "song") {
-                    items.add(ShelfItem.SongItem(SongMapper.map(item)))
-                } else if (type == "album") {
-                    items.add(ShelfItem.AlbumItem(AlbumMapper.map(item)))
-                } else if (type == "playlist") {
-                    items.add(ShelfItem.PlaylistItem(PlaylistMapper.map(item)))
-                }
-            }
+        fun getModuleSubtitle(key: String, fallback: String): String {
+            val mod = modules?.getAsJsonObject(key)
+            val sub = mod?.get("subtitle")?.asString
+            return if (!sub.isNullOrBlank()) JioSaavnImageResolver.unescapeHtml(sub) else fallback
+        }
+
+        val processedKeys = mutableSetOf<String>()
+
+        fun processModule(key: String, defaultTitle: String, defaultSubtitle: String, defaultType: ShelfType? = null) {
+            val arr = json.getAsJsonArray(key) ?: return
+            if (arr.size() == 0) return
+            processedKeys.add(key)
+            val items = parseShelfItems(arr)
             if (items.isNotEmpty()) {
+                val resolvedType = defaultType ?: determineShelfType(items)
                 shelves.add(
                     MusicShelf(
-                        id = "trending",
-                        title = getModuleTitle("new_trending", "Trending Now"),
-                        subtitle = "Hottest tracks and albums right now",
-                        type = ShelfType.SONG_HORIZONTAL,
+                        id = key,
+                        title = getModuleTitle(key, defaultTitle),
+                        subtitle = getModuleSubtitle(key, defaultSubtitle),
+                        type = resolvedType,
                         items = items
                     )
                 )
             }
         }
 
-        // 2. New Albums / Releases
-        val newAlbumsArr = json.getAsJsonArray("new_albums")
-        if (newAlbumsArr != null && newAlbumsArr.size() > 0) {
-            val albums = AlbumMapper.mapList(newAlbumsArr)
-            if (albums.isNotEmpty()) {
-                shelves.add(
-                    MusicShelf(
-                        id = "new_releases",
-                        title = getModuleTitle("new_albums", "New Releases"),
-                        subtitle = "Fresh albums & singles",
-                        type = ShelfType.ALBUM_HORIZONTAL,
-                        items = albums.map { ShelfItem.AlbumItem(it) }
-                    )
-                )
-            }
-        }
+        // 1. Trending Now
+        processModule("new_trending", "Trending Now", "Hottest tracks and albums right now", ShelfType.SONG_HORIZONTAL)
+
+        // 2. New Releases / Albums
+        processModule("new_albums", "New Releases", "Fresh albums & singles", ShelfType.ALBUM_HORIZONTAL)
 
         // 3. Top Playlists
-        val topPlaylistsArr = json.getAsJsonArray("top_playlists")
-        if (topPlaylistsArr != null && topPlaylistsArr.size() > 0) {
-            val playlists = PlaylistMapper.mapList(topPlaylistsArr)
-            if (playlists.isNotEmpty()) {
-                shelves.add(
-                    MusicShelf(
-                        id = "top_playlists",
-                        title = getModuleTitle("top_playlists", "Top Playlists"),
-                        subtitle = "Handcrafted for every vibe",
-                        type = ShelfType.PLAYLIST_HORIZONTAL,
-                        items = playlists.map { ShelfItem.PlaylistItem(it) }
-                    )
-                )
-            }
-        }
+        processModule("top_playlists", "Top Playlists", "Handcrafted for every vibe", ShelfType.PLAYLIST_HORIZONTAL)
 
-        // 4. Charts
-        val chartsArr = json.getAsJsonArray("charts")
-        if (chartsArr != null && chartsArr.size() > 0) {
-            val playlists = PlaylistMapper.mapList(chartsArr)
-            if (playlists.isNotEmpty()) {
-                shelves.add(
-                    MusicShelf(
-                        id = "charts",
-                        title = getModuleTitle("charts", "Top Charts"),
-                        subtitle = "Leading music countdowns",
-                        type = ShelfType.PLAYLIST_HORIZONTAL,
-                        items = playlists.map { ShelfItem.PlaylistItem(it) }
-                    )
-                )
-            }
-        }
+        // 4. Top Charts
+        processModule("charts", "Top Charts", "Leading music countdowns", ShelfType.PLAYLIST_HORIZONTAL)
 
-        // 5. Artist Recommendations (Top Artists with Original Direct DP)
-        val artistRecosArr = json.getAsJsonArray("artist_recos")
-        if (artistRecosArr != null && artistRecosArr.size() > 0) {
-            val artists = ArtistMapper.mapList(artistRecosArr)
-            if (artists.isNotEmpty()) {
-                shelves.add(
-                    MusicShelf(
-                        id = "artist_recos",
-                        title = getModuleTitle("artist_recos", "Top Artists"),
-                        subtitle = "Popular singers & performers",
-                        type = ShelfType.ARTIST_HORIZONTAL,
-                        items = artists.map { ShelfItem.ArtistItem(it) }
+        // 5. Featured / Top Artists
+        processModule("artist_recos", "Top Artists", "Popular singers & performers", ShelfType.ARTIST_HORIZONTAL)
+
+        // 6. City / Regional Hits
+        processModule("city_mod", "City Hits", "Trending music in your city & region", ShelfType.PLAYLIST_HORIZONTAL)
+
+        // 7. Live Radio & Stations
+        processModule("radio", "Live Radio & Stations", "Non-stop music by mood & genre", ShelfType.PLAYLIST_HORIZONTAL)
+
+        // 8. Discover & Explore
+        processModule("browse_discover", "Discover & Explore", "Handpicked gems and editorial selections", ShelfType.PLAYLIST_HORIZONTAL)
+
+        // 9. Mood & Genre Mixes
+        processModule("tag_mixes", "Mood & Genre Mixes", "Curated playlists for every occasion", ShelfType.PLAYLIST_HORIZONTAL)
+
+        // 10. Heavy Rotation
+        processModule("heavy_rotation", "Heavy Rotation", "Most played on repeat", ShelfType.SONG_HORIZONTAL)
+
+        // 11. Dynamically render ALL remaining JioSaavn modules present in response
+        if (modules != null) {
+            for (key in modules.keySet()) {
+                if (!processedKeys.contains(key) && json.has(key) && json.get(key).isJsonArray) {
+                    val rawTitle = getModuleTitle(
+                        key,
+                        key.replace("_", " ").split(" ").joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
                     )
-                )
+                    processModule(key, rawTitle, "Curated music for you")
+                }
             }
         }
 
         return shelves
+    }
+
+    private fun parseShelfItems(arr: JsonArray): List<ShelfItem> {
+        val items = mutableListOf<ShelfItem>()
+        for (i in 0 until arr.size()) {
+            try {
+                val elem = arr.get(i)
+                if (!elem.isJsonObject) continue
+                val item = elem.asJsonObject
+                val type = item.get("type")?.asString?.lowercase() ?: ""
+                when (type) {
+                    "song" -> items.add(ShelfItem.SongItem(SongMapper.map(item)))
+                    "album" -> items.add(ShelfItem.AlbumItem(AlbumMapper.map(item)))
+                    "playlist", "chart", "radio", "radio_station", "channel" -> items.add(ShelfItem.PlaylistItem(PlaylistMapper.map(item)))
+                    "artist" -> items.add(ShelfItem.ArtistItem(ArtistMapper.map(item)))
+                    else -> {
+                        if (item.has("header_desc") || item.has("listid") || item.has("list_count")) {
+                            items.add(ShelfItem.PlaylistItem(PlaylistMapper.map(item)))
+                        } else if (item.has("music") || item.has("primary_artists") || item.has("media_preview_url")) {
+                            items.add(ShelfItem.SongItem(SongMapper.map(item)))
+                        } else if (item.has("artist") && item.has("year")) {
+                            items.add(ShelfItem.AlbumItem(AlbumMapper.map(item)))
+                        } else if (item.has("role") || item.has("follower_count")) {
+                            items.add(ShelfItem.ArtistItem(ArtistMapper.map(item)))
+                        } else {
+                            items.add(ShelfItem.PlaylistItem(PlaylistMapper.map(item)))
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return items
+    }
+
+    private fun determineShelfType(items: List<ShelfItem>): ShelfType {
+        val songCount = items.count { it is ShelfItem.SongItem }
+        val albumCount = items.count { it is ShelfItem.AlbumItem }
+        val artistCount = items.count { it is ShelfItem.ArtistItem }
+        val playlistCount = items.count { it is ShelfItem.PlaylistItem }
+
+        return when {
+            songCount >= albumCount && songCount >= artistCount && songCount >= playlistCount -> ShelfType.SONG_HORIZONTAL
+            albumCount >= artistCount && albumCount >= playlistCount -> ShelfType.ALBUM_HORIZONTAL
+            artistCount >= playlistCount -> ShelfType.ARTIST_HORIZONTAL
+            else -> ShelfType.PLAYLIST_HORIZONTAL
+        }
     }
 }

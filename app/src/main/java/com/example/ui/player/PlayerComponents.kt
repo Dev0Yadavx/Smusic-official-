@@ -13,7 +13,10 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -108,13 +111,24 @@ import kotlin.math.sin
 data class DynamicSongColors(
     val seedColor: Color,
     val primary: Color,
+    val onPrimary: Color = if (primary.luminance() > 0.45f) Color(0xFF0C1014) else Color.White,
+    val primaryContainer: Color = primary.copy(alpha = 0.28f),
+    val onPrimaryContainer: Color = Color.White,
     val secondary: Color,
+    val onSecondary: Color = if (secondary.luminance() > 0.45f) Color(0xFF0C1014) else Color.White,
+    val secondaryContainer: Color = secondary.copy(alpha = 0.20f),
     val tertiary: Color,
     val backgroundTop: Color,
     val backgroundBottom: Color,
-    val surfaceContainer: Color,
+    val surface: Color = if (backgroundBottom.luminance() < 0.5f) Color(0xFF101318) else Color(0xFFF8F9FD),
     val onSurface: Color,
+    val surfaceVariant: Color = if (backgroundBottom.luminance() < 0.5f) Color(0xFF222630) else Color(0xFFEBEFF6),
     val onSurfaceVariant: Color,
+    val surfaceContainer: Color,
+    val surfaceContainerHigh: Color = if (backgroundBottom.luminance() < 0.5f) Color(0xFF262B36) else Color(0xFFE5EAF3),
+    val surfaceContainerHighest: Color = if (backgroundBottom.luminance() < 0.5f) Color(0xFF2C3342) else Color(0xFFD9DFEC),
+    val outline: Color = if (backgroundBottom.luminance() < 0.5f) Color.White.copy(alpha = 0.20f) else Color.Black.copy(alpha = 0.14f),
+    val outlineVariant: Color = if (backgroundBottom.luminance() < 0.5f) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.08f),
     val glowAccent: Color
 )
 
@@ -231,16 +245,32 @@ fun rememberDynamicSongColors(
     val onSurf = if (isDark) Color(0xFFF0F4F0) else Color(0xFF121A16)
     val onSurfVar = if (isDark) Color(0xFFA8B4AD) else Color(0xFF53635B)
 
+    val onPrim = if (animPrimary.luminance() > 0.45f) Color(0xFF0C1014) else Color.White
+    val onSec = if (animSecondary.luminance() > 0.45f) Color(0xFF0C1014) else Color.White
+    val onSurfProtected = if (isDark) Color.White else Color(0xFF0F1218)
+    val onSurfVarProtected = if (isDark) Color(0xFFC6CCD8) else Color(0xFF454B56)
+
     return DynamicSongColors(
         seedColor = basePrimary,
         primary = animPrimary,
+        onPrimary = onPrim,
+        primaryContainer = animPrimary.copy(alpha = if (isDark) 0.30f else 0.20f),
+        onPrimaryContainer = onSurfProtected,
         secondary = animSecondary,
+        onSecondary = onSec,
+        secondaryContainer = animSecondary.copy(alpha = if (isDark) 0.24f else 0.16f),
         tertiary = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706),
         backgroundTop = bgTop,
         backgroundBottom = bgBottom,
+        surface = if (isDark) Color(0xFF0F1116) else Color(0xFFF8F9FD),
+        onSurface = onSurfProtected,
+        surfaceVariant = if (isDark) Color(0xFF1E232E) else Color(0xFFE9EEF6),
+        onSurfaceVariant = onSurfVarProtected,
         surfaceContainer = surfContainer,
-        onSurface = onSurf,
-        onSurfaceVariant = onSurfVar,
+        surfaceContainerHigh = if (isDark) Color(0xFF242A36) else Color(0xFFE2E7F2),
+        surfaceContainerHighest = if (isDark) Color(0xFF2C3342) else Color(0xFFD9DFEC),
+        outline = if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.14f),
+        outlineVariant = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f),
         glowAccent = animPrimary.copy(alpha = 0.45f)
     )
 }
@@ -1140,96 +1170,212 @@ fun ImmersivePosterNowPlayingLayout(
     // Real-time connected audio output device (Bluetooth, Headphones, USB, or Speaker)
     val activeAudioDevice = rememberActiveAudioOutputDevice()
 
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+    // Dynamic Surface Dark / Light Support & Dynamic Harmony
+    val controlSurfaceColor = if (isDark) {
+        Color(0xFF1E222A).copy(alpha = 0.88f)
+    } else {
+        Color.White.copy(alpha = 0.94f)
+    }
+
+    val controlContentColor = if (isDark) {
+        Color.White
+    } else {
+        Color(0xFF0F1115)
+    }
+
+    val controlBorder = BorderStroke(
+        width = 1.dp,
+        color = if (isDark) {
+            Color.White.copy(alpha = 0.16f)
+        } else {
+            Color.Black.copy(alpha = 0.08f)
+        }
+    )
+
+    // Clean, high-contrast Play / Stop Push Button Surface (Dynamic color removed from Play Push as requested)
+    val playSurfaceColor = if (isDark) {
+        Color.White
+    } else {
+        Color(0xFF141720)
+    }
+
+    val playContentColor = if (isDark) {
+        Color(0xFF0F1115)
+    } else {
+        Color.White
+    }
+
+    // Square Large Play Push Button Corner Shape (Modern Squircle Square)
+    val playSquareCornerRadius by animateDpAsState(
+        targetValue = if (isPlaying) 18.dp else 22.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "play_square_shape"
+    )
+    val playSquareShape = RoundedCornerShape(playSquareCornerRadius)
+
+    // Expensive UI touch feedback & spring animation effects
+    val playInteractionSource = remember { MutableInteractionSource() }
+    val isPlayPressed by playInteractionSource.collectIsPressedAsState()
+    val playScale by animateFloatAsState(
+        targetValue = if (isPlayPressed) 0.88f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 380f),
+        label = "play_press_scale"
+    )
+    val playElevation by animateDpAsState(
+        targetValue = if (isPlayPressed) 4.dp else 16.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "play_elev"
+    )
+
+    val prevInteractionSource = remember { MutableInteractionSource() }
+    val isPrevPressed by prevInteractionSource.collectIsPressedAsState()
+    val prevScale by animateFloatAsState(
+        targetValue = if (isPrevPressed) 0.86f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 420f),
+        label = "prev_press_scale"
+    )
+    val prevTranslationX by animateFloatAsState(
+        targetValue = if (isPrevPressed) -6f else 0f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 450f),
+        label = "prev_shift"
+    )
+
+    val nextInteractionSource = remember { MutableInteractionSource() }
+    val isNextPressed by nextInteractionSource.collectIsPressedAsState()
+    val nextScale by animateFloatAsState(
+        targetValue = if (isNextPressed) 0.86f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 420f),
+        label = "next_press_scale"
+    )
+    val nextTranslationX by animateFloatAsState(
+        targetValue = if (isNextPressed) 6f else 0f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 450f),
+        label = "next_shift"
+    )
+
+    val prevBorder = if (isPrevPressed) {
+        BorderStroke(1.5.dp, dynamicColors.primary.copy(alpha = 0.85f))
+    } else {
+        controlBorder
+    }
+
+    val nextBorder = if (isNextPressed) {
+        BorderStroke(1.5.dp, dynamicColors.primary.copy(alpha = 0.85f))
+    } else {
+        controlBorder
+    }
+
+    val prevElevation by animateDpAsState(
+        targetValue = if (isPrevPressed) 2.dp else 8.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "prev_elev"
+    )
+
+    val nextElevation by animateDpAsState(
+        targetValue = if (isNextPressed) 2.dp else 8.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "next_elev"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF070809))
+            .background(if (isDark) Color(0xFF0D0F14) else Color(0xFFF2F4FA))
     ) {
-        // 1. Background Layer:
-        // In Spotify-style mode, full background is deeply blurred ambient cover.
-        // In Full Poster mode, full-bleed sharp cover is rendered in upper canvas.
-        AsyncImage(
-            model = track.artwork,
-            contentDescription = track.title,
-            modifier = Modifier
-                .fillMaxSize()
-                .then(
-                    if (isSpotifyStyleCover) {
-                        Modifier
-                            .scale(1.25f)
-                            .blur(55.dp)
-                    } else {
-                        Modifier
-                    }
-                )
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null
-                ) {
-                    isSpotifyStyleCover = !isSpotifyStyleCover
-                }
-                .testTag("now_playing_artwork_toggle"),
-            contentScale = ContentScale.Crop
-        )
-
-        // 2. Smooth Progressive Mask Blur Below Seekbar ("mask style blur rudus seekbar se neche")
-        // Uses full-screen aligned artwork with Offscreen DstIn vertical gradient alpha mask
-        // so there is NEVER a hard horizontal line and the blur feathers in smoothly around/below the seekbar.
-        AsyncImage(
-            model = track.artwork,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    compositingStrategy = CompositingStrategy.Offscreen
-                }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to Color.Transparent,
-                                0.64f to Color.Transparent,
-                                0.74f to Color.Black.copy(alpha = 0.65f),
-                                0.84f to Color.Black,
-                                1.0f to Color.Black
-                            )
-                        ),
-                        blendMode = BlendMode.DstIn
-                    )
-                }
-                .blur(28.dp),
-            contentScale = ContentScale.Crop
-        )
-
-        // Smooth bottom dark scrim starting gently around the track title & seekbar down to the bottom controls
+        // 1. Dynamic Full Colour Background Layer (Zero Blur, pure Material 3 full-color immersive atmosphere)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.0f to Color.Transparent,
-                            0.56f to Color.Transparent,
-                            0.68f to Color.Black.copy(alpha = 0.38f),
-                            0.78f to Color.Black.copy(alpha = 0.72f),
-                            0.90f to Color(0xFF07080A).copy(alpha = 0.90f),
-                            1.0f to Color(0xFF050608).copy(alpha = 0.96f)
-                        )
+                        colors = if (isDark) {
+                            listOf(
+                                dynamicColors.primary.copy(alpha = 0.52f),
+                                dynamicColors.secondary.copy(alpha = 0.36f),
+                                dynamicColors.surfaceVariant.copy(alpha = 0.88f),
+                                Color(0xFF0D1016)
+                            )
+                        } else {
+                            listOf(
+                                dynamicColors.primary.copy(alpha = 0.42f),
+                                dynamicColors.secondary.copy(alpha = 0.30f),
+                                dynamicColors.primaryContainer.copy(alpha = 0.45f),
+                                dynamicColors.surfaceContainerHigh.copy(alpha = 0.92f)
+                            )
+                        }
                     )
                 )
         )
+
+        // Subtle ambient dynamic color bloom in the upper area (Zero Blur - pure smooth radial brush)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(450.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            dynamicColors.primary.copy(alpha = if (isDark) 0.38f else 0.30f),
+                            dynamicColors.secondary.copy(alpha = if (isDark) 0.20f else 0.16f),
+                            Color.Transparent
+                        ),
+                        radius = 950f
+                    )
+                )
+        )
+
+        // If user tapped into Full Poster Art Mode, display crisp full-bleed cover (Zero Blur)
+        if (!isSpotifyStyleCover) {
+            AsyncImage(
+                model = track.artwork,
+                contentDescription = track.title,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        isSpotifyStyleCover = true
+                    }
+                    .testTag("now_playing_artwork_toggle"),
+                contentScale = ContentScale.Crop
+            )
+
+            // Scrim over full-bleed poster so all controls and text retain 100% contrast protection
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Black.copy(alpha = 0.50f),
+                                0.32f to Color.Transparent,
+                                0.58f to Color.Transparent,
+                                0.72f to Color.Black.copy(alpha = 0.68f),
+                                0.88f to Color(0xFF07080A).copy(alpha = 0.94f),
+                                1.0f to Color(0xFF050608).copy(alpha = 0.98f)
+                            )
+                        )
+                    )
+            )
+        }
 
         // Subtle top vignette for header readability
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
+                .height(130.dp)
                 .align(Alignment.TopCenter)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.55f),
+                            Color.Black.copy(alpha = 0.45f),
                             Color.Transparent
                         )
                     )
@@ -1293,22 +1439,22 @@ fun ImmersivePosterNowPlayingLayout(
                     enter = fadeIn(tween(280)) + scaleIn(initialScale = 0.86f, animationSpec = tween(320, easing = FastOutSlowInEasing)),
                     exit = fadeOut(tween(220)) + scaleOut(targetScale = 0.90f, animationSpec = tween(240))
                 ) {
-                    // Large Spotify-Style Centered Square Album Cover Card
+                    // Large Spotify-Style Centered Square Album Cover Card (Zero Blur)
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(1f)
+                            .fillMaxWidth(0.92f)
                             .aspectRatio(1f)
                             .shadow(
-                                elevation = 32.dp,
-                                shape = RoundedCornerShape(22.dp),
+                                elevation = 28.dp,
+                                shape = RoundedCornerShape(24.dp),
                                 spotColor = dynamicColors.primary.copy(alpha = 0.55f)
                             )
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFF16191D))
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(dynamicColors.surfaceContainerHigh)
                             .border(
                                 width = 1.dp,
-                                color = Color.White.copy(alpha = 0.16f),
-                                shape = RoundedCornerShape(22.dp)
+                                color = dynamicColors.outlineVariant.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(24.dp)
                             )
                     ) {
                         AsyncImage(
@@ -1389,12 +1535,12 @@ fun ImmersivePosterNowPlayingLayout(
                     )
                 }
 
-                // Segmented White Icon Group: Start Rounding (Like), Small Inner Rounding (Download), End Rounding (More)
+                // Segmented Dynamic Icon Group: Start Rounding (Like), Small Inner Rounding (Download), End Rounding (More)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    // 1. Like Button (Start Rounding + Small End Rounding, White Shape)
+                    // 1. Like Button (Start Rounding + Small End Rounding, Dynamic Surface)
                     Surface(
                         onClick = onToggleLike,
                         shape = RoundedCornerShape(
@@ -1403,7 +1549,8 @@ fun ImmersivePosterNowPlayingLayout(
                             topEnd = 6.dp,
                             bottomEnd = 6.dp
                         ),
-                        color = Color.White,
+                        color = controlSurfaceColor,
+                        border = controlBorder,
                         shadowElevation = 6.dp,
                         modifier = Modifier
                             .size(width = 40.dp, height = 38.dp)
@@ -1414,17 +1561,18 @@ fun ImmersivePosterNowPlayingLayout(
                             Icon(
                                 imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                                 contentDescription = "Favorite",
-                                tint = if (isLiked) Color(0xFFE11D48) else Color(0xFF0F1115),
+                                tint = if (isLiked) Color(0xFFE11D48) else controlContentColor,
                                 modifier = Modifier.size(19.dp)
                             )
                         }
                     }
 
-                    // 2. Download Button (Small Rounding, White Shape)
+                    // 2. Download Button (Small Rounding, Dynamic Surface)
                     Surface(
                         onClick = onDownload,
                         shape = RoundedCornerShape(6.dp),
-                        color = Color.White,
+                        color = controlSurfaceColor,
+                        border = controlBorder,
                         shadowElevation = 6.dp,
                         modifier = Modifier
                             .size(width = 40.dp, height = 38.dp)
@@ -1434,21 +1582,21 @@ fun ImmersivePosterNowPlayingLayout(
                             if (isDownloading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
-                                    color = Color(0xFF0F1115),
+                                    color = controlContentColor,
                                     strokeWidth = 2.dp
                                 )
                             } else {
                                 Icon(
                                     imageVector = if (isDownloaded) AppIcons.DownloadForOffline else AppIcons.Download,
                                     contentDescription = if (isDownloaded) "Downloaded" else "Download",
-                                    tint = if (isDownloaded) Color(0xFF059669) else Color(0xFF0F1115),
+                                    tint = if (isDownloaded) Color(0xFF059669) else controlContentColor,
                                     modifier = Modifier.size(19.dp)
                                 )
                             }
                         }
                     }
 
-                    // 3. More Options Button (Small Start Rounding + End Rounding, White Shape)
+                    // 3. More Options Button (Small Start Rounding + End Rounding, Dynamic Surface)
                     Surface(
                         onClick = onMoreOptions,
                         shape = RoundedCornerShape(
@@ -1457,7 +1605,8 @@ fun ImmersivePosterNowPlayingLayout(
                             topEnd = 20.dp,
                             bottomEnd = 20.dp
                         ),
-                        color = Color.White,
+                        color = controlSurfaceColor,
+                        border = controlBorder,
                         shadowElevation = 6.dp,
                         modifier = Modifier
                             .size(width = 40.dp, height = 38.dp)
@@ -1467,7 +1616,7 @@ fun ImmersivePosterNowPlayingLayout(
                             Icon(
                                 imageVector = Icons.Default.MoreHoriz,
                                 contentDescription = "More Options",
-                                tint = Color(0xFF0F1115),
+                                tint = controlContentColor,
                                 modifier = Modifier.size(19.dp)
                             )
                         }
@@ -1477,9 +1626,10 @@ fun ImmersivePosterNowPlayingLayout(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Splash-Screen Loading Progress Style Seekbar ("seekbar jo splash screen me loading progress tha wahi use")
+            // Splash-Screen Loading Progress Style Seekbar
             Column(modifier = Modifier.fillMaxWidth()) {
                 val safeDuration = totalDurationMs.toFloat().coerceAtLeast(1f)
+                val currentSafeDuration by rememberUpdatedState(safeDuration)
                 val progressFraction = (displayPositionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
                 var barWidthPx by remember { mutableFloatStateOf(1f) }
 
@@ -1490,23 +1640,23 @@ fun ImmersivePosterNowPlayingLayout(
                         .onSizeChanged { size ->
                             barWidthPx = size.width.toFloat().coerceAtLeast(1f)
                         }
-                        .pointerInput(safeDuration) {
+                        .pointerInput(Unit) {
                             detectTapGestures { offset ->
                                 val fraction = (offset.x / barWidthPx).coerceIn(0f, 1f)
-                                onSeek(fraction * safeDuration)
+                                onSeek(fraction * currentSafeDuration)
                                 onSeekFinished()
                             }
                         }
-                        .pointerInput(safeDuration) {
+                        .pointerInput(Unit) {
                             detectHorizontalDragGestures(
                                 onDragStart = { offset ->
                                     val fraction = (offset.x / barWidthPx).coerceIn(0f, 1f)
-                                    onSeek(fraction * safeDuration)
+                                    onSeek(fraction * currentSafeDuration)
                                 },
                                 onHorizontalDrag = { change, _ ->
                                     change.consume()
                                     val fraction = (change.position.x / barWidthPx).coerceIn(0f, 1f)
-                                    onSeek(fraction * safeDuration)
+                                    onSeek(fraction * currentSafeDuration)
                                 },
                                 onDragEnd = {
                                     onSeekFinished()
@@ -1568,95 +1718,119 @@ fun ImmersivePosterNowPlayingLayout(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Playback Controls Row: Segmented White Shapes (Start Rounding Prev, Small Inner Rounding Play/Pause, End Rounding Next)
+            // Playback Controls Row: Square Large Play Push with Start Rounding Prev & End Rounding Next (Expensive UI M3 Suite)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Previous Track (Start Rounding + Small End Rounding, White Shape)
+                // Previous Track: START ROUNDING (32dp start, 12dp inner) + Expensive UI Springs & Press Glow
                 Surface(
                     onClick = onPrevious,
                     shape = RoundedCornerShape(
-                        topStart = 28.dp,
-                        bottomStart = 28.dp,
-                        topEnd = 8.dp,
-                        bottomEnd = 8.dp
+                        topStart = 32.dp,
+                        bottomStart = 32.dp,
+                        topEnd = 12.dp,
+                        bottomEnd = 12.dp
                     ),
-                    color = Color.White,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
+                    color = controlSurfaceColor,
+                    border = prevBorder,
+                    shadowElevation = prevElevation,
+                    interactionSource = prevInteractionSource,
+                    modifier = Modifier
+                        .size(width = 68.dp, height = 62.dp)
+                        .graphicsLayer {
+                            scaleX = prevScale
+                            scaleY = prevScale
+                            translationX = prevTranslationX
+                        }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = AppIcons.SkipPrevious,
                             contentDescription = "Previous",
-                            tint = Color(0xFF0F1115),
+                            tint = controlContentColor,
                             modifier = Modifier.size(28.dp)
                         )
                     }
                 }
 
-                // Play / Stop (Square when playing, Round when stopped/paused, with PLAY/STOP text)
+                // Play / Stop Push Button: SQUARE LARGE (84dp x 76dp, 18dp squircle) + High Contrast & Spring Bounce
                 Surface(
                     onClick = onPlayPause,
-                    shape = if (isPlaying) RoundedCornerShape(12.dp) else CircleShape,
-                    color = Color.White,
-                    shadowElevation = 12.dp,
-                    modifier = Modifier.size(width = 96.dp, height = 64.dp)
+                    shape = playSquareShape,
+                    color = playSurfaceColor,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.14f)
+                    ),
+                    shadowElevation = playElevation,
+                    interactionSource = playInteractionSource,
+                    modifier = Modifier
+                        .size(width = 84.dp, height = 76.dp)
+                        .graphicsLayer {
+                            scaleX = playScale
+                            scaleY = playScale
+                        }
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (isBuffering) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(28.dp),
-                                color = Color(0xFF0F1115),
-                                strokeWidth = 3.dp
+                                modifier = Modifier.size(36.dp),
+                                color = playContentColor,
+                                strokeWidth = 3.5.dp
                             )
                         } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
+                            AnimatedContent(
+                                targetState = isPlaying,
+                                transitionSpec = {
+                                    (scaleIn(initialScale = 0.65f, animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f)) + fadeIn(tween(180))) togetherWith
+                                    (scaleOut(targetScale = 0.65f, animationSpec = tween(140)) + fadeOut(tween(140)))
+                                },
+                                label = "play_icon_morph"
+                            ) { playing ->
                                 Icon(
-                                    imageVector = if (isPlaying) Icons.Rounded.Stop else AppIcons.PlayArrow,
-                                    contentDescription = if (isPlaying) "Stop" else "Play",
-                                    tint = Color(0xFF0F1115),
-                                    modifier = Modifier.size(26.dp)
-                                )
-                                Text(
-                                    text = if (isPlaying) "STOP" else "PLAY",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F1115),
-                                        fontSize = 12.sp,
-                                        letterSpacing = 0.5.sp
-                                    )
+                                    imageVector = if (playing) Icons.Rounded.Stop else AppIcons.PlayArrow,
+                                    contentDescription = if (playing) "Stop" else "Play",
+                                    tint = playContentColor,
+                                    modifier = Modifier.size(38.dp)
                                 )
                             }
                         }
                     }
                 }
 
-                // Next Track (Small Start Rounding + End Rounding, White Shape)
+                // Next Track: END ROUNDING (12dp inner, 32dp end) + Expensive UI Springs & Press Glow
                 Surface(
                     onClick = onNext,
                     shape = RoundedCornerShape(
-                        topStart = 8.dp,
-                        bottomStart = 8.dp,
-                        topEnd = 28.dp,
-                        bottomEnd = 28.dp
+                        topStart = 12.dp,
+                        bottomStart = 12.dp,
+                        topEnd = 32.dp,
+                        bottomEnd = 32.dp
                     ),
-                    color = Color.White,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
+                    color = controlSurfaceColor,
+                    border = nextBorder,
+                    shadowElevation = nextElevation,
+                    interactionSource = nextInteractionSource,
+                    modifier = Modifier
+                        .size(width = 68.dp, height = 62.dp)
+                        .graphicsLayer {
+                            scaleX = nextScale
+                            scaleY = nextScale
+                            translationX = nextTranslationX
+                        }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = AppIcons.SkipNext,
                             contentDescription = "Next",
-                            tint = Color(0xFF0F1115),
+                            tint = controlContentColor,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -1665,7 +1839,7 @@ fun ImmersivePosterNowPlayingLayout(
 
             Spacer(modifier = Modifier.height(22.dp))
 
-            // Bottom Dock: Segmented White Shapes (Start Rounding Queue, Small Inner Rounding Lyrics, End Rounding Audio Output Device)
+            // Bottom Dock: Segmented Dynamic Shapes (Start Rounding Queue, End Rounding Lyrics, Round Capsule Speaker)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1674,7 +1848,7 @@ fun ImmersivePosterNowPlayingLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // Queue Button - Start Rounding + Small End Rounding, White Shape
+                    // Queue Button - Start Rounding + Small End Rounding, Dynamic Surface
                     Surface(
                         onClick = onOpenQueue,
                         shape = RoundedCornerShape(
@@ -1683,7 +1857,8 @@ fun ImmersivePosterNowPlayingLayout(
                             topEnd = 6.dp,
                             bottomEnd = 6.dp
                         ),
-                        color = Color.White,
+                        color = controlSurfaceColor,
+                        border = controlBorder,
                         shadowElevation = 6.dp,
                         modifier = Modifier
                             .size(width = 46.dp, height = 42.dp)
@@ -1696,17 +1871,23 @@ fun ImmersivePosterNowPlayingLayout(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                                 contentDescription = "Queue",
-                                tint = Color(0xFF0F1115),
+                                tint = controlContentColor,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     }
 
-                    // Lyrics Button - Small Inner Rounding, White Shape
+                    // Lyrics Button - Small Inner Rounding + END ROUNDING, Dynamic Surface
                     Surface(
                         onClick = onOpenLyrics,
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color.White,
+                        shape = RoundedCornerShape(
+                            topStart = 6.dp,
+                            bottomStart = 6.dp,
+                            topEnd = 22.dp,
+                            bottomEnd = 22.dp
+                        ),
+                        color = controlSurfaceColor,
+                        border = controlBorder,
                         shadowElevation = 6.dp,
                         modifier = Modifier
                             .size(width = 46.dp, height = 42.dp)
@@ -1719,18 +1900,19 @@ fun ImmersivePosterNowPlayingLayout(
                             Icon(
                                 imageVector = Icons.Default.Lyrics,
                                 contentDescription = "Lyrics",
-                                tint = Color(0xFF0F1115),
+                                tint = controlContentColor,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
-                // Real-time Audio Output Device / Speaker Pill - Round up-down capsule shape
+                // Real-time Audio Output Device / Speaker Pill - Round up-down capsule shape, Dynamic Surface
                 Surface(
                     onClick = onOpenDeviceSelector,
                     shape = RoundedCornerShape(22.dp),
-                    color = Color.White,
+                    color = controlSurfaceColor,
+                    border = controlBorder,
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .height(42.dp)
@@ -1752,7 +1934,7 @@ fun ImmersivePosterNowPlayingLayout(
                         Icon(
                             imageVector = activeAudioDevice.icon,
                             contentDescription = activeAudioDevice.name,
-                            tint = Color(0xFF0F1115),
+                            tint = controlContentColor,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(7.dp))
@@ -1760,7 +1942,7 @@ fun ImmersivePosterNowPlayingLayout(
                             text = activeAudioDevice.name,
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F1115),
+                                color = controlContentColor,
                                 fontSize = 13.sp
                             ),
                             maxLines = 1,
@@ -3288,8 +3470,11 @@ fun LyricsBottomSheet(
 
     LaunchedEffect(track.id) {
         isLoading = true
-        val lyrics = repository.getLyrics(track.lyricsId, null)
-        lyricsText = lyrics
+        val lyrics = repository.getLyrics(track.lyricsId, track.id)
+        lyricsText = lyrics?.replace("<br\\s*/?>".toRegex(RegexOption.IGNORE_CASE), "\n")
+            ?.replace("&quot;", "\"")
+            ?.replace("&#039;", "'")
+            ?.replace("&amp;", "&")
         isLoading = false
     }
 

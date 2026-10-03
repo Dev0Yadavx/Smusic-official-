@@ -186,15 +186,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        // 2. Non-playlist shelves first (Trending Songs, New Releases Albums, Top Artists)
-        val nonPlaylistShelves = apiShelves.filter { it.type != ShelfType.PLAYLIST_HORIZONTAL }
-        val playlistApiShelves = apiShelves.filter { it.type == ShelfType.PLAYLIST_HORIZONTAL }
-        list.addAll(nonPlaylistShelves)
+        // 2. All JioSaavn Home Shelves in natural curated order
+        list.addAll(apiShelves)
 
-        // 3. Online Playlist Shelves (Top Playlists & Charts)
-        list.addAll(playlistApiShelves)
-
-        // 4. Saved Local Playlists with Artwork & Title
+        // 3. Saved Local Playlists with Artwork & Title
         if (localPlaylists.isNotEmpty()) {
             val localItems = localPlaylists.map { summary ->
                 ShelfItem.PlaylistItem(

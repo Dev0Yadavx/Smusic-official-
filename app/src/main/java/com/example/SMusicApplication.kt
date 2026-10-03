@@ -10,6 +10,11 @@ import kotlinx.coroutines.launch
 
 class SMusicApplication : Application() {
 
+    companion object {
+        @Volatile
+        var hasShownSplashThisSession: Boolean = false
+    }
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {

@@ -1,5 +1,5 @@
 
-name: SMusic Android Build
+name: SMusic Complete Android Build
 
 on:
   push:
@@ -20,28 +20,66 @@ jobs:
     name: Build Debug, Release APK and AAB
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
 
-      # 1. Checkout repository
+      # 1. Checkout
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Setup JDK
+      # 2. Java
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Setup Android SDK
-      # IMPORTANT: Do not add "tools" package here.
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
+      # 3. Setup Android SDK without setup-android action
+      - name: Install Android SDK Packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDK_ROOT="$ANDROID_HOME"
+
+          if [ ! -d "$SDK_ROOT" ]; then
+            echo "Android SDK directory not found: $SDK_ROOT"
+            exit 1
+          fi
+
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" \
+            -type f -name sdkmanager | sort -V | tail -n 1)"
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found!"
+            find "$SDK_ROOT" -maxdepth 5 -type f -name sdkmanager
+            exit 1
+          fi
+
+          echo "Using SDK Manager: $SDKMANAGER"
+
+          # Accept Android SDK licenses
+          yes | "$SDKMANAGER" \
+            --sdk_root="$SDK_ROOT" \
+            --licenses || true
+
+          # Install required SDK packages
+          "$SDKMANAGER" \
+            --sdk_root="$SDK_ROOT" \
+            --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+          # Verify installation
+          test -x "$SDK_ROOT/platform-tools/adb"
+          test -x "$SDK_ROOT/build-tools/36.0.0/apksigner"
+          test -x "$SDK_ROOT/build-tools/36.0.0/aapt"
+
+          echo "Android SDK installation successful."
 
       # 4. Setup Gradle
       - name: Setup Gradle
@@ -49,7 +87,7 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      # 5. Check GitHub Secrets
+      # 5. Check signing secrets
       - name: Check Signing Secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -61,12 +99,12 @@ jobs:
 
           for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             if [ -z "${!name:-}" ]; then
-              echo "Missing secret: $name"
+              echo "Missing GitHub Secret: $name"
               exit 1
             fi
           done
 
-          echo "All signing secrets are configured."
+          echo "Signing secrets are configured."
 
       # 6. Decode release keystore
       - name: Setup Release Keystore
@@ -77,11 +115,12 @@ jobs:
 
           mkdir -p app
 
-          echo "$KEYSTORE_BASE64" | base64 --decode > app/release.jks
+          echo "$KEYSTORE_BASE64" \
+            | base64 --decode > app/release.jks
 
           test -s app/release.jks
 
-          echo "Release keystore ready."
+          echo "Release keystore created."
 
       # 7. Verify keystore
       - name: Verify Release Keystore
@@ -119,13 +158,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" \
-            -type f -name apksigner | sort -V | tail -n 1)"
-
-          if [ -z "$APKSIGNER" ]; then
-            echo "apksigner not found!"
-            exit 1
-          fi
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
 
           mapfile -t APKS < <(
             find app/build/outputs/apk/release \
@@ -133,7 +166,7 @@ jobs:
           )
 
           if [ "${#APKS[@]}" -eq 0 ]; then
-            echo "No Release APK found!"
+            echo "No release APK found!"
             exit 1
           fi
 
@@ -146,6 +179,7 @@ jobs:
 
       # 10. Verify AAB
       - name: Verify Release AAB
+        shell: bash
         run: |
           set -euo pipefail
 
@@ -164,23 +198,22 @@ jobs:
             jarsigner -verify -verbose -certs "$AAB"
           done
 
-          echo "AAB signature verification successful."
+          echo "AAB verification successful."
 
-      # 11. Get version information
+      # 11. Get app version
       - name: Get App Version
         id: version
         shell: bash
         run: |
           set -euo pipefail
 
-          AAPT="$(find "$ANDROID_HOME/build-tools" \
-            -type f -name aapt | sort -V | tail -n 1)"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
 
           APK="$(find app/build/outputs/apk/release \
             -type f -name '*.apk' | sort | head -n 1)"
 
-          if [ -z "$AAPT" ] || [ -z "$APK" ]; then
-            echo "APK or aapt not found!"
+          if [ -z "$APK" ]; then
+            echo "Release APK not found!"
             exit 1
           fi
 
@@ -199,11 +232,11 @@ jobs:
           echo "Version Code: $VERSION_CODE"
 
       # 12. Upload Release APK
-      - name: Upload Release APK
+      - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
         with:
           name: SMusic-Release-v${{ steps.version.outputs.version_name }}
-          path: app/build/outputs/apk/release/**/*.apk
+          path: app/build/outputs/apk/release/
           if-no-files-found: error
           retention-days: 30
 
@@ -212,7 +245,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SMusic-Debug-v${{ steps.version.outputs.version_name }}
-          path: app/build/outputs/apk/debug/**/*.apk
+          path: app/build/outputs/apk/debug/
           if-no-files-found: error
           retention-days: 30
 
@@ -221,7 +254,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SMusic-AAB-v${{ steps.version.outputs.version_name }}
-          path: app/build/outputs/bundle/release/*.aab
+          path: app/build/outputs/bundle/release/
           if-no-files-found: error
           retention-days: 30
 
@@ -235,8 +268,8 @@ jobs:
             echo "- Version: ${{ steps.version.outputs.version_name }}"
             echo "- Version Code: ${{ steps.version.outputs.version_code }}"
             echo "- Debug APK: Generated"
-            echo "- Release APK: Generated and verified"
-            echo "- Release AAB: Generated and verified"
+            echo "- Release APK: Signed and verified"
+            echo "- AAB: Generated and verified"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # 16. Cleanup keystore

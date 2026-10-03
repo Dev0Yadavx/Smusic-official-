@@ -17,32 +17,39 @@ concurrency:
 
 jobs:
   build:
-    name: Build APK and AAB
+    name: Build Debug, Release APK and AAB
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout
+
+      # 1. Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Java
+      # 2. Setup JDK
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Android SDK
+      # 3. Setup Android SDK
+      # IMPORTANT: Do not add "tools" package here.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
 
-      # 4. Gradle
+      # 4. Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: '9.3.1'
 
-      # 5. Check signing secrets
+      # 5. Check GitHub Secrets
       - name: Check Signing Secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -54,14 +61,14 @@ jobs:
 
           for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             if [ -z "${!name:-}" ]; then
-              echo "Missing GitHub Secret: $name"
+              echo "Missing secret: $name"
               exit 1
             fi
           done
 
           echo "All signing secrets are configured."
 
-      # 6. Decode Keystore
+      # 6. Decode release keystore
       - name: Setup Release Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -70,14 +77,28 @@ jobs:
 
           mkdir -p app
 
-          echo "$KEYSTORE_BASE64" \
-            | base64 --decode > app/release.jks
+          echo "$KEYSTORE_BASE64" | base64 --decode > app/release.jks
 
           test -s app/release.jks
 
           echo "Release keystore ready."
 
-      # 7. Build Debug APK, Release APK and AAB
+      # 7. Verify keystore
+      - name: Verify Release Keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+
+          keytool -list \
+            -keystore app/release.jks \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS"
+
+          echo "Keystore verification successful."
+
+      # 8. Build Debug APK, Release APK and AAB
       - name: Build All Variants
         env:
           KEYSTORE_FILE: ${{ github.workspace }}/app/release.jks
@@ -92,7 +113,7 @@ jobs:
             :app:assembleRelease \
             :app:bundleRelease
 
-      # 8. Verify Release APK signatures
+      # 9. Verify release APK signatures
       - name: Verify Release APK Signatures
         shell: bash
         run: |
@@ -117,13 +138,13 @@ jobs:
           fi
 
           for APK in "${APKS[@]}"; do
-            echo "Checking $APK"
+            echo "Verifying: $APK"
             "$APKSIGNER" verify --verbose --print-certs "$APK"
           done
 
           echo "All Release APK signatures verified."
 
-      # 9. Verify AAB signature
+      # 10. Verify AAB
       - name: Verify Release AAB
         run: |
           set -euo pipefail
@@ -139,11 +160,13 @@ jobs:
           fi
 
           for AAB in "${AABS[@]}"; do
-            echo "Checking $AAB"
+            echo "Verifying: $AAB"
             jarsigner -verify -verbose -certs "$AAB"
           done
 
-      # 10. Read version information
+          echo "AAB signature verification successful."
+
+      # 11. Get version information
       - name: Get App Version
         id: version
         shell: bash
@@ -156,7 +179,7 @@ jobs:
           APK="$(find app/build/outputs/apk/release \
             -type f -name '*.apk' | sort | head -n 1)"
 
-          if [ -z "$APK" ] || [ -z "$AAPT" ]; then
+          if [ -z "$AAPT" ] || [ -z "$APK" ]; then
             echo "APK or aapt not found!"
             exit 1
           fi
@@ -175,8 +198,8 @@ jobs:
           echo "Version: $VERSION_NAME"
           echo "Version Code: $VERSION_CODE"
 
-      # 11. Upload Release APK
-      - name: Upload Signed Release APK
+      # 12. Upload Release APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: SMusic-Release-v${{ steps.version.outputs.version_name }}
@@ -184,16 +207,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # 12. Upload Debug APK
+      # 13. Upload Debug APK
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: SMusic-Debug
+          name: SMusic-Debug-v${{ steps.version.outputs.version_name }}
           path: app/build/outputs/apk/debug/**/*.apk
           if-no-files-found: error
           retention-days: 30
 
-      # 13. Upload AAB
+      # 14. Upload AAB
       - name: Upload Release AAB
         uses: actions/upload-artifact@v4
         with:
@@ -202,17 +225,24 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # 14. Build summary
+      # 15. Build summary
       - name: Build Summary
         if: success()
         run: |
-          echo "# SMusic Build Successful" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Version: ${{ steps.version.outputs.version_name }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Version Code: ${{ steps.version.outputs.version_code }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Debug APK: Generated" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Release APK: Generated and verified" >> "$GITHUB_STEP_SUMMARY"
-          echo "- AAB: Generated and verified" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Build completed successfully." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "# SMusic Build Successful"
+            echo ""
+            echo "- Version: ${{ steps.version.outputs.version_name }}"
+            echo "- Version Code: ${{ steps.version.outputs.version_code }}"
+            echo "- Debug APK: Generated"
+            echo "- Release APK: Generated and verified"
+            echo "- Release AAB: Generated and verified"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 16. Cleanup keystore
+      - name: Cleanup Keystore
+        if: always()
+        run: |
+          rm -f app/release.jks
+          echo "Temporary keystore removed."
           

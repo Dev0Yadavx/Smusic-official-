@@ -239,7 +239,8 @@ fun LibraryScreen(
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 22.sp
-                        )
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 

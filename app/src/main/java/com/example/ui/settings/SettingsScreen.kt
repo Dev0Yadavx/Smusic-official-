@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,15 +27,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.remote.StreamUrlResolver
 import com.example.player.EqualizerManager
 import com.example.player.PlayerManager
@@ -43,10 +48,43 @@ import com.example.ui.common.UserAvatarBadge
 import com.example.ui.common.UserProfileM3CardDialog
 import com.example.ui.theme.AccentPalette
 import com.example.ui.theme.FontOption
+import com.example.ui.theme.MiniPlayerScallopedShape
 import com.example.ui.theme.NowPlayingStyle
 import com.example.ui.theme.ThemeManager
 import com.example.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
+
+private val GitHubIcon: ImageVector
+    get() = ImageVector.Builder(
+        name = "GitHub",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        addPath(
+            pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+                "M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+            ).toNodes(),
+            fill = androidx.compose.ui.graphics.SolidColor(Color.White)
+        )
+    }.build()
+
+private val TelegramIcon: ImageVector
+    get() = ImageVector.Builder(
+        name = "Telegram",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        addPath(
+            pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+                "M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.536-.194 1.006.131.832.942z"
+            ).toNodes(),
+            fill = androidx.compose.ui.graphics.SolidColor(Color.White)
+        )
+    }.build()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +100,7 @@ fun SettingsScreen(
     val equalizerManager = remember { EqualizerManager.getInstance(context) }
     var showEqualizerScreen by rememberSaveable { mutableStateOf(false) }
     var showLicensesScreen by rememberSaveable { mutableStateOf(false) }
+    var showAboutScreen by rememberSaveable { mutableStateOf(false) }
 
     if (showEqualizerScreen) {
         EqualizerScreen(
@@ -75,6 +114,14 @@ fun SettingsScreen(
     if (showLicensesScreen) {
         OpenSourceLicensesScreen(
             onBack = { showLicensesScreen = false },
+            modifier = modifier
+        )
+        return
+    }
+
+    if (showAboutScreen) {
+        AboutAppScreen(
+            onBack = { showAboutScreen = false },
             modifier = modifier
         )
         return
@@ -393,10 +440,22 @@ fun SettingsScreen(
                 }
             }
 
-            // 5. OPEN SOURCE LICENSES CATEGORY (Single item in Settings -> opens dedicated Layout)
+            // 5. ABOUT & INFO CATEGORY
             item {
-                SettingsCategoryHeader(title = "Open Source & Licenses")
+                SettingsCategoryHeader(title = "About & Info")
                 SettingsLargeCard {
+                    // About App Option Item (Opens dedicated AboutAppScreen)
+                    SettingsOptionRow(
+                        icon = Icons.Outlined.Info,
+                        title = "About App",
+                        valueText = "v1.0.0",
+                        onClick = { showAboutScreen = true },
+                        testTag = "settings_about_app_item"
+                    )
+
+                    SettingsDivider()
+
+                    // Open Source Licenses Option Item
                     SettingsOptionRow(
                         icon = Icons.Outlined.Description,
                         title = "Open Source Licenses",
@@ -1339,6 +1398,340 @@ fun OpenSourceLicensesScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AboutAppScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BackHandler { onBack() }
+    val uriHandler = LocalUriHandler.current
+
+    Scaffold(
+        containerColor = Color.Transparent,
+        topBar = {
+            TopAppBar(
+                title = { Text("About App", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
+            )
+        },
+        modifier = modifier
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 165.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1. APP LOGO, NAME & VERSION CARD
+            item {
+                SettingsCategoryHeader(title = "Application Overview")
+                SettingsLargeCard {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(MiniPlayerScallopedShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.MusicNote,
+                                contentDescription = "SMusic App Icon",
+                                tint = Color.White,
+                                modifier = Modifier.size(42.dp)
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "SMusic",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 26.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "Version 1.0.0 (Build 2026.10)",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 12.5.sp
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Expressive Material 3 Music Player for Android with synced lyrics, offline equalizer, dynamic theme palettes, and seamless audio playback.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // 2. DEVELOPER LEAD CARD
+            item {
+                SettingsCategoryHeader(title = "Developer Lead")
+                SettingsLargeCard {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFF59E0B),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "DEVELOPER LEAD",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 1.2.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.5.sp
+                                )
+                            )
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFF59E0B),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f))
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                    RoundedCornerShape(22.dp)
+                                )
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(62.dp)
+                                    .clip(MiniPlayerScallopedShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                MaterialTheme.colorScheme.tertiaryContainer
+                                            )
+                                        )
+                                    )
+                                    .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), MiniPlayerScallopedShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AsyncImage(
+                                    model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                        .data("https://avatars.githubusercontent.com/u/257059002?v=4")
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Developer Lead Avatar",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(MiniPlayerScallopedShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "—͟͞͞ 𝙔ᴀᴅᴀᴠ<\\>x- 🇮🇳",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 16.5.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Lead Developer & Creator",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        // Social Buttons Row (GitHub & Telegram)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // GitHub Button
+                            Surface(
+                                onClick = {
+                                    runCatching { uriHandler.openUri("https://github.com/Dev0Yadavx") }
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("about_github_button")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = GitHubIcon,
+                                        contentDescription = "GitHub",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "GitHub",
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.5.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            // Telegram Button
+                            Surface(
+                                onClick = {
+                                    runCatching { uriHandler.openUri("https://t.me/YADAVXAHIR") }
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                                color = Color(0xFF0088CC).copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, Color(0xFF0088CC).copy(alpha = 0.40f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("about_telegram_button")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = TelegramIcon,
+                                        contentDescription = "Telegram",
+                                        tint = Color(0xFF0088CC),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Telegram",
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.5.sp
+                                        ),
+                                        color = Color(0xFF0088CC)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. SYSTEM & ENGINE INFORMATION CARD
+            item {
+                SettingsCategoryHeader(title = "App Features & Stack")
+                SettingsLargeCard {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        SettingsOptionRow(
+                            icon = Icons.Outlined.Layers,
+                            title = "UI Framework",
+                            valueText = "Jetpack Compose M3",
+                            onClick = {},
+                            testTag = "about_ui_framework"
+                        )
+                        SettingsDivider()
+                        SettingsOptionRow(
+                            icon = Icons.Outlined.GraphicEq,
+                            title = "Playback Engine",
+                            valueText = "Media3 ExoPlayer",
+                            onClick = {},
+                            testTag = "about_playback_engine"
+                        )
+                        SettingsDivider()
+                        SettingsOptionRow(
+                            icon = Icons.Outlined.Lyrics,
+                            title = "Lyrics Engine",
+                            valueText = "LRCLIB Synced",
+                            onClick = {},
+                            testTag = "about_lyrics_engine"
+                        )
+                        SettingsDivider()
+                        SettingsOptionRow(
+                            icon = Icons.Outlined.Palette,
+                            title = "Theme Engine",
+                            valueText = "Dynamic & Pure OLED",
+                            onClick = {},
+                            testTag = "about_theme_engine"
+                        )
                     }
                 }
             }

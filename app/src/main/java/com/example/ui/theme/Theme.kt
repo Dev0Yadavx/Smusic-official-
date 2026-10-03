@@ -40,11 +40,11 @@ fun buildExpressiveDarkColorScheme(
         tertiary = accent.tertiary,
         onTertiary = Color.White,
         background = bg,
-        onBackground = PixelTextPrimary,
+        onBackground = Color.White,
         surface = surf,
-        onSurface = PixelTextPrimary,
+        onSurface = Color.White,
         surfaceVariant = surfVar,
-        onSurfaceVariant = PixelTextSecondary,
+        onSurfaceVariant = Color(0xFFCBD5E1),
         surfaceContainer = surfCard,
         surfaceContainerHigh = surfCard,
         surfaceContainerHighest = surfVar,
@@ -208,26 +208,35 @@ fun SMusicTheme(
                 if (isAmoledBlack) {
                     baseScheme.copy(
                         background = AmoledDarkBackground,
+                        onBackground = Color.White,
                         surface = AmoledDarkSurface,
-                        surfaceVariant = AmoledDarkSurfaceVariant,
                         onSurface = Color.White,
-                        onSurfaceVariant = Color(0xFFCBD5E1)
+                        surfaceVariant = AmoledDarkSurfaceVariant,
+                        onSurfaceVariant = Color(0xFFCBD5E1),
+                        onPrimaryContainer = Color.White,
+                        onSecondaryContainer = Color.White
                     )
                 } else {
                     baseScheme.copy(
+                        onBackground = Color.White,
                         onSurface = Color.White,
-                        onSurfaceVariant = Color(0xFFCBD5E1)
+                        onSurfaceVariant = Color(0xFFCBD5E1),
+                        onPrimaryContainer = Color.White,
+                        onSecondaryContainer = Color.White
                     )
                 }
             } else {
                 baseScheme.copy(
+                    onBackground = PixelLightTextPrimary,
                     surface = Color.White,
                     surfaceContainer = Color.White,
                     surfaceContainerHigh = Color.White,
                     surfaceContainerHighest = Color.White,
                     secondaryContainer = Color.White,
                     onSurface = PixelLightTextPrimary,
-                    onSurfaceVariant = PixelLightTextSecondary
+                    onSurfaceVariant = PixelLightTextSecondary,
+                    onPrimaryContainer = PixelLightPrimary,
+                    onSecondaryContainer = PixelLightTextPrimary
                 )
             }
         }
@@ -238,10 +247,14 @@ fun SMusicTheme(
     val colorScheme = animateColorScheme(rawColorScheme)
     val typography = getAppTypography(fontOption, useDeviceFont)
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = typography,
-        content = content
-    )
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalContentColor provides colorScheme.onBackground
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = typography,
+            content = content
+        )
+    }
 }
 

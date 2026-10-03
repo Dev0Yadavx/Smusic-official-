@@ -1,4 +1,5 @@
-name: SMusic Auto Release
+
+name: SMusic - All Version Auto Release
 
 on:
   push:
@@ -10,24 +11,24 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  release:
-    name: Build Signed APKs + AAB
+  build:
+    name: Build All APKs and AAB
     runs-on: ubuntu-latest
 
     steps:
 
-      # ==========================================
-      # 1. LATEST CODE
-      # ==========================================
+      # 1. Checkout latest source code
       - name: Checkout Latest Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ==========================================
-      # 2. JAVA
-      # ==========================================
+      # 2. Setup Java 17
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -35,44 +36,41 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # ==========================================
-      # 3. GRADLE
-      # ==========================================
+      # 3. Setup Gradle
       - name: Setup Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      # ==========================================
-      # 4. SIGNING KEY
-      # ==========================================
+      # 4. Decode signing keystore
       - name: Decode Release Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          set -e
+          test -n "$KEYSTORE_BASE64"
           printf '%s' "$KEYSTORE_BASE64" \
             | base64 --decode \
             > "$RUNNER_TEMP/release.jks"
 
-      # ==========================================
-      # 5. VERIFY KEYSTORE
-      # ==========================================
-      - name: Verify Release Keystore
+          test -s "$RUNNER_TEMP/release.jks"
+
+      # 5. Verify signing key
+      - name: Verify Keystore
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          set -e
           keytool -list \
             -keystore "$KEYSTORE_FILE" \
             -storetype PKCS12 \
             -storepass "$KEYSTORE_PASSWORD" \
             -alias "$KEY_ALIAS"
 
-      # ==========================================
-      # 6. CREATE TEMP ABI CONFIG
-      # ==========================================
-      - name: Configure ARM64 + Universal
+      # 6. Configure all ABI + Universal APKs
+      - name: Configure All ABI APKs
         run: |
           python3 <<'PY'
           from pathlib import Path
@@ -82,31 +80,48 @@ jobs:
 
           marker = "android {"
 
-          abi_config = r'''
+          abi_config = """
               splits {
                   abi {
                       isEnable = true
                       reset()
-                      include("arm64-v8a")
+                      include(
+                          "armeabi-v7a",
+                          "arm64-v8a",
+                          "x86",
+                          "x86_64"
+                      )
                       isUniversalApk = true
                   }
               }
-
-          '''
+          """
 
           if "isUniversalApk = true" not in text:
+              if marker not in text:
+                  raise SystemExit("Android block not found!")
+
               text = text.replace(
                   marker,
-                  marker + "\n" + abi_config,
+                  marker + "\\n" + abi_config,
                   1
               )
 
           path.write_text(text)
+          print("All ABI APK configuration completed!")
           PY
 
-      # ==========================================
-      # 7. CLEAN EVERYTHING
-      # ==========================================
+      # 7. Check release signing environment
+      - name: Check Signing Configuration
+        run: |
+          test -n "$KEYSTORE_FILE"
+          test -f "$KEYSTORE_FILE"
+          test -n "$KEY_ALIAS"
+          echo "Signing configuration available."
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      # 8. Clean old builds
       - name: Clean Project
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/release.jks
@@ -116,10 +131,8 @@ jobs:
         run: |
           gradle clean --no-daemon
 
-      # ==========================================
-      # 8. BUILD SIGNED APK
-      # ==========================================
-      - name: Build Signed APK
+      # 9. Build all signed APKs
+      - name: Build All Release APKs
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -128,10 +141,8 @@ jobs:
         run: |
           gradle assembleRelease --no-daemon
 
-      # ==========================================
-      # 9. BUILD SIGNED AAB
-      # ==========================================
-      - name: Build Signed AAB
+      # 10. Build signed AAB
+      - name: Build Release AAB
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -140,39 +151,63 @@ jobs:
         run: |
           gradle bundleRelease --no-daemon
 
-      # ==========================================
-      # 10. SHOW OUTPUT
-      # ==========================================
-      - name: Show Build Files
+      # 11. Verify generated APK files
+      - name: Verify APK Outputs
         run: |
-          echo "========== APK =========="
-          find app/build/outputs/apk/release \
-            -type f \
-            -name "*.apk" \
-            -print
+          set -e
 
-          echo "========== AAB =========="
-          find app/build/outputs/bundle/release \
-            -type f \
-            -name "*.aab" \
-            -print
+          APK_DIR="app/build/outputs/apk/release"
+          AAB_DIR="app/build/outputs/bundle/release"
 
-      # ==========================================
-      # 11. UPLOAD ALL APKs
-      # ==========================================
-      - name: Upload APKs
+          echo "===== GENERATED APK FILES ====="
+          find "$APK_DIR" -type f -name "*.apk" -print
+
+          echo "===== GENERATED AAB FILES ====="
+          find "$AAB_DIR" -type f -name "*.aab" -print
+
+          APK_COUNT=$(find "$APK_DIR" -type f -name "*.apk" | wc -l)
+
+          if [ "$APK_COUNT" -lt 2 ]; then
+            echo "Expected ABI and Universal APK outputs."
+            exit 1
+          fi
+
+          test -n "$(find "$AAB_DIR" -type f -name "*.aab" -print -quit)"
+
+          echo "APK and AAB verification completed."
+
+      # 12. Upload all APKs
+      - name: Upload All Release APKs
         uses: actions/upload-artifact@v4
         with:
-          name: SMusic-APKs
+          name: SMusic-All-APKs
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+          retention-days: 30
 
-      # ==========================================
-      # 12. UPLOAD AAB
-      # ==========================================
-      - name: Upload AAB
+      # 13. Upload AAB
+      - name: Upload Release AAB
         uses: actions/upload-artifact@v4
         with:
-          name: SMusic-AAB
+          name: SMusic-Release-AAB
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
+          retention-days: 30
+
+      # 14. Build summary
+      - name: Release Summary
+        if: success()
+        run: |
+          echo "## SMusic Release Successful" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### APK Files" >> "$GITHUB_STEP_SUMMARY"
+          find app/build/outputs/apk/release \
+            -name "*.apk" -printf '- %f\n' \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### AAB Files" >> "$GITHUB_STEP_SUMMARY"
+          find app/build/outputs/bundle/release \
+            -name "*.aab" -printf '- %f\n' \
+            >> "$GITHUB_STEP_SUMMARY"
+            

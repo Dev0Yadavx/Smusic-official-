@@ -238,12 +238,12 @@ fun HomeScreen(
                             )
                         )
 
-                        // Greeting Pill with Avatar
+                        // Greeting Pill with Avatar (Nickname displayed down for clean long names)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(24.dp))
+                                .clip(RoundedCornerShape(20.dp))
                                 .background(
                                     if (isDark) Color(0xFF1B1B24).copy(alpha = 0.72f)
                                     else Color.White.copy(alpha = 0.88f)
@@ -252,7 +252,7 @@ fun HomeScreen(
                                     1.dp,
                                     if (isDark) Color.White.copy(alpha = 0.16f)
                                     else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
-                                    RoundedCornerShape(24.dp)
+                                    RoundedCornerShape(20.dp)
                                 )
                                 .clickable { showProfileDialog = true }
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
@@ -261,20 +261,30 @@ fun HomeScreen(
                             UserAvatarBadge(
                                 emoji = userAvatarEmoji,
                                 customImageUri = userAvatarImageUri,
-                                size = 26.dp,
-                                fontSize = 13.sp
+                                size = 28.dp,
+                                fontSize = 14.sp
                             )
 
-                            Text(
-                                text = "$greeting, $userNickname",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.5.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                                Text(
+                                    text = greeting,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                                Text(
+                                    text = userNickname,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
 

@@ -86,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import coil.ImageLoader
+import coil.imageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -162,7 +163,7 @@ fun rememberDynamicSongColors(
 
         withContext(Dispatchers.IO) {
             try {
-                val loader = ImageLoader(context)
+                val loader = context.imageLoader
                 val request = ImageRequest.Builder(context)
                     .data(artworkUrl)
                     .allowHardware(false)
@@ -1172,33 +1173,29 @@ fun ImmersivePosterNowPlayingLayout(
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-    // Dynamic Surface Dark / Light Support & Dynamic Harmony
+    // Dynamic Surface Dark (White Shapes) / Light (Black Shapes) Support
     val controlSurfaceColor = if (isDark) {
-        Color(0xFF1E222A).copy(alpha = 0.88f)
+        Color.White.copy(alpha = 0.18f)
     } else {
-        Color.White.copy(alpha = 0.94f)
+        Color(0xFF101216)
     }
 
-    val controlContentColor = if (isDark) {
-        Color.White
-    } else {
-        Color(0xFF0F1115)
-    }
+    val controlContentColor = Color.White
 
     val controlBorder = BorderStroke(
         width = 1.dp,
         color = if (isDark) {
-            Color.White.copy(alpha = 0.16f)
+            Color.White.copy(alpha = 0.30f)
         } else {
-            Color.Black.copy(alpha = 0.08f)
+            Color.Black.copy(alpha = 0.40f)
         }
     )
 
-    // Clean, high-contrast Play / Stop Push Button Surface (Dynamic color removed from Play Push as requested)
+    // Play / Pause Push Button Surface: White in Dark mode, Black in Light mode
     val playSurfaceColor = if (isDark) {
         Color.White
     } else {
-        Color(0xFF141720)
+        Color(0xFF101216)
     }
 
     val playContentColor = if (isDark) {
@@ -1209,7 +1206,7 @@ fun ImmersivePosterNowPlayingLayout(
 
     // Square Large Play Push Button Corner Shape (Modern Squircle Square)
     val playSquareCornerRadius by animateDpAsState(
-        targetValue = if (isPlaying) 18.dp else 22.dp,
+        targetValue = if (isPlaying) 20.dp else 24.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -1231,6 +1228,17 @@ fun ImmersivePosterNowPlayingLayout(
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "play_elev"
     )
+
+    // Prev & Next Rounding Shape: White in Dark mode, Black in Light mode
+    val prevNextSurfaceColor = if (isDark) {
+        Color.White.copy(alpha = 0.18f)
+    } else {
+        Color(0xFF101216)
+    }
+
+    val prevNextContentColor = Color.White
+
+    val prevNextShape = RoundedCornerShape(28.dp)
 
     val prevInteractionSource = remember { MutableInteractionSource() }
     val isPrevPressed by prevInteractionSource.collectIsPressedAsState()
@@ -1259,15 +1267,15 @@ fun ImmersivePosterNowPlayingLayout(
     )
 
     val prevBorder = if (isPrevPressed) {
-        BorderStroke(1.5.dp, dynamicColors.primary.copy(alpha = 0.85f))
+        BorderStroke(1.5.dp, dynamicColors.primary.copy(alpha = 0.90f))
     } else {
-        controlBorder
+        BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.32f) else Color.Black.copy(alpha = 0.40f))
     }
 
     val nextBorder = if (isNextPressed) {
-        BorderStroke(1.5.dp, dynamicColors.primary.copy(alpha = 0.85f))
+        BorderStroke(1.5.dp, dynamicColors.primary.copy(alpha = 0.90f))
     } else {
-        controlBorder
+        BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.32f) else Color.Black.copy(alpha = 0.40f))
     }
 
     val prevElevation by animateDpAsState(
@@ -1282,12 +1290,18 @@ fun ImmersivePosterNowPlayingLayout(
         label = "next_elev"
     )
 
+    val nowPlayingTextColor = if (isDark) Color.White else Color(0xFF101216)
+    val nowPlayingSubtextColor = if (isDark) Color.White.copy(alpha = 0.82f) else Color(0xFF101216).copy(alpha = 0.82f)
+    val nowPlayingLabelColor = if (isDark) Color.White.copy(alpha = 0.68f) else Color.Black.copy(alpha = 0.68f)
+    val seekbarTrackColor = if (isDark) Color.White.copy(alpha = 0.24f) else Color.Black.copy(alpha = 0.24f)
+    val seekbarActiveColor = if (isDark) Color.White else Color(0xFF101216)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(if (isDark) Color(0xFF0D0F14) else Color(0xFFF2F4FA))
     ) {
-        // 1. Dynamic Full Colour Background Layer (Zero Blur, pure Material 3 full-color immersive atmosphere)
+        // 1. Dynamic Full Colour Background Layer (Full-screen rich Material 3 vibrant dynamic color atmosphere)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1295,37 +1309,39 @@ fun ImmersivePosterNowPlayingLayout(
                     Brush.verticalGradient(
                         colors = if (isDark) {
                             listOf(
-                                dynamicColors.primary.copy(alpha = 0.52f),
-                                dynamicColors.secondary.copy(alpha = 0.36f),
-                                dynamicColors.surfaceVariant.copy(alpha = 0.88f),
-                                Color(0xFF0D1016)
+                                dynamicColors.primary.copy(alpha = 0.92f),
+                                dynamicColors.secondary.copy(alpha = 0.80f),
+                                dynamicColors.primary.copy(alpha = 0.60f),
+                                dynamicColors.secondary.copy(alpha = 0.45f),
+                                dynamicColors.backgroundBottom.copy(alpha = 0.96f)
                             )
                         } else {
                             listOf(
-                                dynamicColors.primary.copy(alpha = 0.42f),
-                                dynamicColors.secondary.copy(alpha = 0.30f),
-                                dynamicColors.primaryContainer.copy(alpha = 0.45f),
-                                dynamicColors.surfaceContainerHigh.copy(alpha = 0.92f)
+                                dynamicColors.primary.copy(alpha = 0.80f),
+                                dynamicColors.secondary.copy(alpha = 0.64f),
+                                dynamicColors.primaryContainer.copy(alpha = 0.70f),
+                                dynamicColors.secondaryContainer.copy(alpha = 0.60f),
+                                dynamicColors.backgroundBottom.copy(alpha = 0.94f)
                             )
                         }
                     )
                 )
         )
 
-        // Subtle ambient dynamic color bloom in the upper area (Zero Blur - pure smooth radial brush)
+        // Subtle ambient dynamic color bloom in the upper area (smooth radial brush)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(450.dp)
+                .height(480.dp)
                 .align(Alignment.TopCenter)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            dynamicColors.primary.copy(alpha = if (isDark) 0.38f else 0.30f),
-                            dynamicColors.secondary.copy(alpha = if (isDark) 0.20f else 0.16f),
+                            dynamicColors.primary.copy(alpha = if (isDark) 0.45f else 0.38f),
+                            dynamicColors.secondary.copy(alpha = if (isDark) 0.28f else 0.22f),
                             Color.Transparent
                         ),
-                        radius = 950f
+                        radius = 1100f
                     )
                 )
         )
@@ -1391,7 +1407,7 @@ fun ImmersivePosterNowPlayingLayout(
                 .padding(horizontal = 22.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar: Close arrow & Share icon removed — Clean centered NOW PLAYING + Track title
+            // Top Bar: Clean centered NOW PLAYING + Track title
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -1401,7 +1417,7 @@ fun ImmersivePosterNowPlayingLayout(
                 Text(
                     text = "NOW PLAYING",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = Color.White.copy(alpha = 0.68f),
+                        color = nowPlayingLabelColor,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.4.sp,
                         fontSize = 10.5.sp
@@ -1411,7 +1427,7 @@ fun ImmersivePosterNowPlayingLayout(
                 Text(
                     text = track.title,
                     style = MaterialTheme.typography.titleSmall.copy(
-                        color = Color.White,
+                        color = nowPlayingTextColor,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     ),
@@ -1421,7 +1437,7 @@ fun ImmersivePosterNowPlayingLayout(
             }
 
             // Center Interactive Artwork Area:
-            // Tapping switches between Full-Bleed Poster Cover and Spotify-Style Square Art Cover
+            // Large Spotify-Style Square Art Cover (Zero Blur)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -1442,19 +1458,19 @@ fun ImmersivePosterNowPlayingLayout(
                     // Large Spotify-Style Centered Square Album Cover Card (Zero Blur)
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.92f)
+                            .fillMaxWidth(0.98f)
                             .aspectRatio(1f)
                             .shadow(
-                                elevation = 28.dp,
-                                shape = RoundedCornerShape(24.dp),
-                                spotColor = dynamicColors.primary.copy(alpha = 0.55f)
+                                elevation = 32.dp,
+                                shape = RoundedCornerShape(26.dp),
+                                spotColor = if (isDark) dynamicColors.primary.copy(alpha = 0.60f) else Color.Black.copy(alpha = 0.35f)
                             )
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(dynamicColors.surfaceContainerHigh)
+                            .clip(RoundedCornerShape(26.dp))
+                            .background(if (isDark) dynamicColors.surfaceContainerHigh else Color.White)
                             .border(
                                 width = 1.dp,
-                                color = dynamicColors.outlineVariant.copy(alpha = 0.35f),
-                                shape = RoundedCornerShape(24.dp)
+                                color = if (isDark) Color.White.copy(alpha = 0.20f) else Color.Black.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(26.dp)
                             )
                     ) {
                         AsyncImage(
@@ -1493,7 +1509,7 @@ fun ImmersivePosterNowPlayingLayout(
                 }
             }
 
-            // Track Title & Artist Info with Segmented White Like, Download & More Buttons
+            // Track Title & Artist Info with Segmented Like, Download & More Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -1511,7 +1527,7 @@ fun ImmersivePosterNowPlayingLayout(
                             fontFamily = AppFontFamily,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = nowPlayingTextColor,
                             letterSpacing = (-0.3).sp
                         ),
                         maxLines = 1,
@@ -1528,7 +1544,7 @@ fun ImmersivePosterNowPlayingLayout(
                             fontStyle = FontStyle.Italic,
                             fontWeight = FontWeight.Normal,
                             fontSize = 15.sp,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = nowPlayingSubtextColor
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1669,25 +1685,25 @@ fun ImmersivePosterNowPlayingLayout(
                         .testTag("now_playing_splash_seekbar"),
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    // Pure White Splash-Screen Style Seekbar ("seekbar white color no any color")
+                    // Contrast Protected Seekbar (White on Dark, Black on Light)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.24f))
+                            .background(seekbarTrackColor)
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .fillMaxWidth(progressFraction)
                                 .clip(CircleShape)
-                                .background(Color.White)
+                                .background(seekbarActiveColor)
                         )
                     }
                 }
 
-                // Time Row: Elapsed & Remaining Time (AAC 320 badge removed)
+                // Time Row: Elapsed & Remaining Time
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1700,7 +1716,7 @@ fun ImmersivePosterNowPlayingLayout(
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White.copy(alpha = 0.9f)
+                            color = nowPlayingTextColor
                         )
                     )
 
@@ -1710,7 +1726,7 @@ fun ImmersivePosterNowPlayingLayout(
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White.copy(alpha = 0.9f)
+                            color = nowPlayingTextColor
                         )
                     )
                 }
@@ -1718,62 +1734,59 @@ fun ImmersivePosterNowPlayingLayout(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Playback Controls Row: Square Large Play Push with Start Rounding Prev & End Rounding Next (Expensive UI M3 Suite)
+            // Playback Controls Row: Square Large Play Push with Rounding Shape Light Prev & Next
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Previous Track: START ROUNDING (32dp start, 12dp inner) + Expensive UI Springs & Press Glow
+                // Previous Track: ROUNDING SHAPE LIGHT + Springs & Press Glow
                 Surface(
                     onClick = onPrevious,
-                    shape = RoundedCornerShape(
-                        topStart = 32.dp,
-                        bottomStart = 32.dp,
-                        topEnd = 12.dp,
-                        bottomEnd = 12.dp
-                    ),
-                    color = controlSurfaceColor,
+                    shape = prevNextShape,
+                    color = prevNextSurfaceColor,
                     border = prevBorder,
                     shadowElevation = prevElevation,
                     interactionSource = prevInteractionSource,
                     modifier = Modifier
-                        .size(width = 68.dp, height = 62.dp)
+                        .size(width = 64.dp, height = 64.dp)
                         .graphicsLayer {
                             scaleX = prevScale
                             scaleY = prevScale
                             translationX = prevTranslationX
                         }
+                        .testTag("now_playing_prev_button")
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = AppIcons.SkipPrevious,
                             contentDescription = "Previous",
-                            tint = controlContentColor,
+                            tint = prevNextContentColor,
                             modifier = Modifier.size(28.dp)
                         )
                     }
                 }
 
-                // Play / Stop Push Button: SQUARE LARGE (84dp x 76dp, 18dp squircle) + High Contrast & Spring Bounce
+                // Play / Pause Push Button: SQUARE LARGE (84dp x 80dp, Squircle) - Zero Text, Pure Animated Push Icon
                 Surface(
                     onClick = onPlayPause,
                     shape = playSquareShape,
                     color = playSurfaceColor,
                     border = BorderStroke(
                         width = 1.dp,
-                        color = if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.14f)
+                        color = if (isDark) Color.White.copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.14f)
                     ),
                     shadowElevation = playElevation,
                     interactionSource = playInteractionSource,
                     modifier = Modifier
-                        .size(width = 84.dp, height = 76.dp)
+                        .size(width = 84.dp, height = 80.dp)
                         .graphicsLayer {
                             scaleX = playScale
                             scaleY = playScale
                         }
+                        .testTag("now_playing_play_pause_button")
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -1795,42 +1808,38 @@ fun ImmersivePosterNowPlayingLayout(
                                 label = "play_icon_morph"
                             ) { playing ->
                                 Icon(
-                                    imageVector = if (playing) Icons.Rounded.Stop else AppIcons.PlayArrow,
-                                    contentDescription = if (playing) "Stop" else "Play",
+                                    imageVector = if (playing) Icons.Rounded.Pause else AppIcons.PlayArrow,
+                                    contentDescription = if (playing) "Pause" else "Play",
                                     tint = playContentColor,
-                                    modifier = Modifier.size(38.dp)
+                                    modifier = Modifier.size(40.dp)
                                 )
                             }
                         }
                     }
                 }
 
-                // Next Track: END ROUNDING (12dp inner, 32dp end) + Expensive UI Springs & Press Glow
+                // Next Track: ROUNDING SHAPE LIGHT + Springs & Press Glow
                 Surface(
                     onClick = onNext,
-                    shape = RoundedCornerShape(
-                        topStart = 12.dp,
-                        bottomStart = 12.dp,
-                        topEnd = 32.dp,
-                        bottomEnd = 32.dp
-                    ),
-                    color = controlSurfaceColor,
+                    shape = prevNextShape,
+                    color = prevNextSurfaceColor,
                     border = nextBorder,
                     shadowElevation = nextElevation,
                     interactionSource = nextInteractionSource,
                     modifier = Modifier
-                        .size(width = 68.dp, height = 62.dp)
+                        .size(width = 64.dp, height = 64.dp)
                         .graphicsLayer {
                             scaleX = nextScale
                             scaleY = nextScale
                             translationX = nextTranslationX
                         }
+                        .testTag("now_playing_next_button")
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = AppIcons.SkipNext,
                             contentDescription = "Next",
-                            tint = controlContentColor,
+                            tint = prevNextContentColor,
                             modifier = Modifier.size(28.dp)
                         )
                     }

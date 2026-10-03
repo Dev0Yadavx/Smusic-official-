@@ -369,17 +369,26 @@ object HomeMapper {
         }
 
         val processedKeys = mutableSetOf<String>()
+        var dynamicCounter = 0
 
         fun processModule(key: String, defaultTitle: String, defaultSubtitle: String, defaultType: ShelfType? = null) {
-            val arr = json.getAsJsonArray(key) ?: return
+            val elem = json.get(key) ?: return
+            val arr = when {
+                elem.isJsonArray -> elem.asJsonArray
+                elem.isJsonObject && elem.asJsonObject.has("data") && elem.asJsonObject.get("data").isJsonArray -> elem.asJsonObject.getAsJsonArray("data")
+                elem.isJsonObject && elem.asJsonObject.has("items") && elem.asJsonObject.get("items").isJsonArray -> elem.asJsonObject.getAsJsonArray("items")
+                elem.isJsonObject && elem.asJsonObject.has("results") && elem.asJsonObject.get("results").isJsonArray -> elem.asJsonObject.getAsJsonArray("results")
+                else -> return
+            }
             if (arr.size() == 0) return
             processedKeys.add(key)
             val items = parseShelfItems(arr)
             if (items.isNotEmpty()) {
                 val resolvedType = defaultType ?: determineShelfType(items)
+                val shelfId = if (shelves.none { it.id == key }) key else "${key}_${++dynamicCounter}"
                 shelves.add(
                     MusicShelf(
-                        id = key,
+                        id = shelfId,
                         title = getModuleTitle(key, defaultTitle),
                         subtitle = getModuleSubtitle(key, defaultSubtitle),
                         type = resolvedType,
@@ -419,16 +428,29 @@ object HomeMapper {
         // 10. Heavy Rotation
         processModule("heavy_rotation", "Heavy Rotation", "Most played on repeat", ShelfType.SONG_HORIZONTAL)
 
-        // 11. Dynamically render ALL remaining JioSaavn modules present in response
+        // 11. Dynamically render ALL modules listed in modules metadata
         if (modules != null) {
             for (key in modules.keySet()) {
-                if (!processedKeys.contains(key) && json.has(key) && json.get(key).isJsonArray) {
+                if (!processedKeys.contains(key)) {
                     val rawTitle = getModuleTitle(
                         key,
                         key.replace("_", " ").split(" ").joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
                     )
                     processModule(key, rawTitle, "Curated music for you")
                 }
+            }
+        }
+
+        // 12. Dynamically render any additional home shelves in json root
+        for (key in json.keySet()) {
+            if (key in listOf("modules", "global_config", "header", "footer", "status", "count", "history")) continue
+            if (!processedKeys.contains(key)) {
+                val rawTitle = key.replace("promo:", "")
+                    .replace("_", " ")
+                    .split(" ")
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
+                processModule(key, rawTitle, "Curated for you")
             }
         }
 

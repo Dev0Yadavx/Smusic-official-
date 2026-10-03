@@ -216,7 +216,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        return list
+        return list.distinctBy { it.id }
     }
 
     fun selectLanguage(language: String) {

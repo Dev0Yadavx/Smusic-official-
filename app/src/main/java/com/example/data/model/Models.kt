@@ -1,31 +1,5 @@
 package com.example.data.model
 
-enum class ContentProvider(
-    val id: String,
-    val displayName: String,
-    val subtitle: String,
-    val badge: String
-) {
-    JIO_SAAVN(
-        id = "jiosaavn",
-        displayName = "JioSaavn",
-        subtitle = "Lossless 320 kbps, Bollywood, Punjabi & Regional music",
-        badge = "CD Quality"
-    ),
-    YT_MUSIC(
-        id = "yt_music",
-        displayName = "YouTube Music",
-        subtitle = "Global singles, trending charts, remixes & official audio",
-        badge = "Global"
-    );
-
-    companion object {
-        fun fromId(id: String?): ContentProvider {
-            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: JIO_SAAVN
-        }
-    }
-}
-
 data class Song(
     val id: String,
     val token: String = "",

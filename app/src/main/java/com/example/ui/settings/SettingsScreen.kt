@@ -89,6 +89,7 @@ fun SettingsScreen(
     val isDynamicSongThemeEnabled by themeManager.isDynamicSongThemeEnabled.collectAsState()
     val accentPalette by themeManager.accentPalette.collectAsState()
     val currentFontOption by themeManager.fontOption.collectAsState()
+    val useDeviceFont by themeManager.useDeviceFont.collectAsState()
     val userNickname by themeManager.userNickname.collectAsState()
     val userAvatarEmoji by themeManager.userAvatarEmoji.collectAsState()
     val userAvatarImageUri by themeManager.userAvatarImageUri.collectAsState()
@@ -96,13 +97,11 @@ fun SettingsScreen(
     val isEqEnabled by equalizerManager.isEnabled.collectAsState()
     val selectedEqPreset by equalizerManager.selectedPreset.collectAsState()
     val isAutoplayEnabled by playerManager.isAutoplayEnabled.collectAsState()
-    val contentProvider by themeManager.contentProvider.collectAsState()
 
     var showProfileCardDialog by remember { mutableStateOf(false) }
     var pauseOnDisconnect by remember { mutableStateOf(true) }
     var selectedQuality by remember { mutableStateOf(StreamUrlResolver.AudioQuality.HIGH) }
 
-    var showContentProviderDialog by remember { mutableStateOf(false) }
     var showThemeModeDialog by remember { mutableStateOf(false) }
     var showAccentDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
@@ -220,19 +219,8 @@ fun SettingsScreen(
 
             // 2. AUDIO & PLAYBACK CATEGORY (Large Card Style Shape)
             item {
-                SettingsCategoryHeader(title = "Audio & Content Provider")
+                SettingsCategoryHeader(title = "Audio & Playback")
                 SettingsLargeCard {
-                    // Content Provider (JioSaavn vs YouTube Music)
-                    SettingsOptionRow(
-                        icon = Icons.Outlined.CloudQueue,
-                        title = "Content Provider",
-                        valueText = contentProvider.displayName,
-                        onClick = { showContentProviderDialog = true },
-                        testTag = "settings_content_provider_item"
-                    )
-
-                    SettingsDivider()
-
                     // Equalizer Option Item
                     SettingsOptionRow(
                         icon = Icons.Outlined.Equalizer,
@@ -356,12 +344,24 @@ fun SettingsScreen(
 
                     SettingsDivider()
 
+                    // Use Device Font Toggle Switch
+                    SettingsToggleOptionRow(
+                        icon = Icons.Outlined.FontDownload,
+                        title = "Use Device Font",
+                        subtitle = "Use system default font instead of Fredoka custom font",
+                        checked = useDeviceFont,
+                        onCheckedChange = { themeManager.setUseDeviceFont(it) },
+                        testTag = "settings_use_device_font_item"
+                    )
+
+                    SettingsDivider()
+
                     // Font Style Option Item
                     SettingsOptionRow(
                         icon = Icons.Outlined.TextFields,
                         title = "Font Style",
-                        valueText = currentFontOption.displayName,
-                        onClick = { showFontDialog = true },
+                        valueText = if (useDeviceFont) "Device System Default" else currentFontOption.displayName,
+                        onClick = { if (!useDeviceFont) showFontDialog = true },
                         testTag = "settings_font_style_item"
                     )
                 }
@@ -407,111 +407,6 @@ fun SettingsScreen(
                 }
             }
         }
-    }
-
-    // Content Provider Selection Dialog (JioSaavn vs YouTube Music)
-    if (showContentProviderDialog) {
-        AlertDialog(
-            onDismissRequest = { showContentProviderDialog = false },
-            title = {
-                Text(
-                    text = "Content Provider",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleLarge
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Switch between JioSaavn and YouTube Music to stream your favorite tracks:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    com.example.data.model.ContentProvider.entries.forEach { provider ->
-                        val isSelected = contentProvider == provider
-                        Surface(
-                            onClick = {
-                                themeManager.setContentProvider(provider)
-                                showContentProviderDialog = false
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Switched content provider to ${provider.displayName}")
-                                }
-                            },
-                            shape = RoundedCornerShape(18.dp),
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                            },
-                            border = BorderStroke(
-                                1.5.dp,
-                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("provider_option_${provider.id}")
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = provider.displayName,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
-                                            modifier = Modifier.padding(horizontal = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = provider.badge,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(3.dp))
-                                    Text(
-                                        text = provider.subtitle,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = {
-                                        themeManager.setContentProvider(provider)
-                                        showContentProviderDialog = false
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("Switched content provider to ${provider.displayName}")
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showContentProviderDialog = false }) {
-                    Text("Close")
-                }
-            }
-        )
     }
 
     // Theme Mode Dialog (Only item options)
@@ -627,22 +522,66 @@ fun SettingsScreen(
         )
     }
 
-    // Font Style Selection Dialog (Only item options)
+    // Font Style Selection Dialog (Only 3 uploaded font options)
     if (showFontDialog) {
         AlertDialog(
             onDismissRequest = { showFontDialog = false },
             title = { Text("Font Style", fontWeight = FontWeight.Bold) },
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     FontOption.entries.forEach { font ->
-                        DialogRadioOptionItem(
-                            title = font.displayName,
-                            selected = currentFontOption == font,
+                        val sampleFontFamily = when (font) {
+                            FontOption.FREDOKA_REGULAR -> com.example.ui.theme.FredokaRegularFontFamily
+                            FontOption.FREDOKA_MEDIUM -> com.example.ui.theme.FredokaMediumFontFamily
+                            FontOption.FREDOKA_SEMIBOLD -> com.example.ui.theme.FredokaSemiBoldFontFamily
+                        }
+                        Surface(
                             onClick = {
                                 themeManager.setFontOption(font)
                                 showFontDialog = false
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (currentFontOption == font) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = currentFontOption == font,
+                                    onClick = {
+                                        themeManager.setFontOption(font)
+                                        showFontDialog = false
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = font.displayName,
+                                        fontFamily = sampleFontFamily,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontFamily = sampleFontFamily,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    )
+                                    Text(
+                                        text = font.subtitle,
+                                        fontFamily = sampleFontFamily,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = sampleFontFamily,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.5.sp
+                                        )
+                                    )
+                                }
                             }
-                        )
+                        }
                     }
                 }
             },
@@ -1046,28 +985,16 @@ private val allOpenSourceLicenses = listOf(
         icon = Icons.Outlined.Extension
     ),
     OpenSourceLicenseItem(
-        id = "plus_jakarta_sans",
-        name = "Plus Jakarta Sans Font",
+        id = "fredoka_font",
+        name = "Fredoka Font Family",
         category = "Fonts & Design",
         version = "OFL 1.1",
-        author = "Tokotype / Google Fonts",
+        author = "Ben Nathan, Milena B. Brandão / Google Fonts",
         licenseName = "OFL-1.1",
-        description = "Geometric modern sans-serif typeface used for bold song titles and italic artist names.",
-        projectUrl = "https://fonts.google.com/specimen/Plus+Jakarta+Sans",
+        description = "Rounded, modern, semi-expanded typeface family bundled with Regular, Medium, and SemiBold styles.",
+        projectUrl = "https://fonts.google.com/specimen/Fredoka",
         licenseUrl = "https://openfontlicense.org",
         icon = Icons.Outlined.FontDownload
-    ),
-    OpenSourceLicenseItem(
-        id = "poppins_inter_fonts",
-        name = "Poppins, Inter & Figtree Fonts",
-        category = "Fonts & Design",
-        version = "OFL 1.1",
-        author = "Google Fonts Contributors",
-        licenseName = "OFL-1.1",
-        description = "Open-source studio typography families bundled for customizable app font styles.",
-        projectUrl = "https://fonts.google.com",
-        licenseUrl = "https://openfontlicense.org",
-        icon = Icons.Outlined.TextFields
     ),
     OpenSourceLicenseItem(
         id = "material_icons",

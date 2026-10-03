@@ -469,26 +469,6 @@ fun PlaylistCard(
                     )
                 }
             }
-
-            if (playlist.isCloudSynced) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.65f),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .size(24.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.CloudDone,
-                            contentDescription = "Firebase Cloud Synced",
-                            tint = Color(0xFF38BDF8),
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))

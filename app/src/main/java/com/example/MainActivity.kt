@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
             val isAmoledBlack by themeManager.isAmoledBlack.collectAsState()
             val accentPalette by themeManager.accentPalette.collectAsState()
             val fontOption by themeManager.fontOption.collectAsState()
+            val useDeviceFont by themeManager.useDeviceFont.collectAsState()
             val isDynamicSongThemeEnabled by themeManager.isDynamicSongThemeEnabled.collectAsState()
             val hasAgreedPermissions by themeManager.hasAgreedPermissions.collectAsState()
 
@@ -139,6 +140,7 @@ class MainActivity : ComponentActivity() {
                 isAmoledBlack = isAmoledBlack,
                 accentPalette = accentPalette,
                 fontOption = fontOption,
+                useDeviceFont = useDeviceFont,
                 songSeedColor = dynamicSongColors?.seedColor ?: dynamicSongColors?.primary,
                 songPrimaryColor = dynamicSongColors?.primary,
                 songSecondaryColor = dynamicSongColors?.secondary

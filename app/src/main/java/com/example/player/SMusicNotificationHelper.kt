@@ -79,10 +79,10 @@ object SMusicNotificationHelper {
 
             val cloudChannel = NotificationChannel(
                 CHANNEL_CLOUD_SYNC,
-                "Firebase Cloud Playlists",
+                "Playlists & Library",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Firebase playlist sync and cloud library updates"
+                description = "Playlist updates and library alerts"
                 setShowBadge(true)
                 enableVibration(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
@@ -192,8 +192,8 @@ object SMusicNotificationHelper {
                 .setSmallIcon(R.drawable.ic_music_note)
                 .setLargeIcon(bitmap)
                 .setContentTitle(playlistTitle)
-                .setContentText("$songCount songs synced to Firebase Cloud Playlists")
-                .setSubText("Firebase Sync")
+                .setContentText("$songCount songs saved to Playlists")
+                .setSubText("Library")
                 .setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(buildLaunchPendingIntent(context))

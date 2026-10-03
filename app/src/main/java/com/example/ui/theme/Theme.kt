@@ -145,7 +145,8 @@ fun SMusicTheme(
     dynamicColor: Boolean = true,
     isAmoledBlack: Boolean = false,
     accentPalette: AccentPalette = AccentPalette.VIOLET,
-    fontOption: FontOption = FontOption.PLUS_JAKARTA_SANS,
+    fontOption: FontOption = FontOption.FREDOKA_REGULAR,
+    useDeviceFont: Boolean = false,
     songSeedColor: Color? = null,
     songPrimaryColor: Color? = null,
     songSecondaryColor: Color? = null,
@@ -212,7 +213,7 @@ fun SMusicTheme(
     }
 
     val colorScheme = animateColorScheme(rawColorScheme)
-    val typography = getAppTypography(fontOption)
+    val typography = getAppTypography(fontOption, useDeviceFont)
 
     MaterialTheme(
         colorScheme = colorScheme,

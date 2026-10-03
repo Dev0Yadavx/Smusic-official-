@@ -25,7 +25,6 @@ enum class LibraryTab {
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
 
     val repository = MusicRepository(application)
-    val firebaseManager = com.example.data.remote.FirebasePlaylistManager.getInstance(application)
     private val playerManager = PlayerManager.getInstance(application)
     private val downloadManager = com.example.download.SongDownloadManager.getInstance(application)
 
@@ -43,8 +42,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     val playlistsWithPreviews: StateFlow<List<com.example.data.model.UserPlaylistSummary>> = repository.userPlaylistsWithPreviews
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val cloudPlaylists: StateFlow<List<com.example.data.model.Playlist>> = firebaseManager.cloudPlaylists
 
     private val _localSongs = MutableStateFlow<List<PlayableTrack>>(emptyList())
     val localSongs: StateFlow<List<PlayableTrack>> = _localSongs.asStateFlow()
@@ -104,22 +101,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun deleteCloudPlaylist(playlistId: String) {
-        viewModelScope.launch {
-            firebaseManager.deleteCloudPlaylist(playlistId)
-        }
-    }
-
-    fun syncPlaylistsToFirebase(activityContext: android.content.Context) {
-        viewModelScope.launch {
-            if (firebaseManager.currentUser.value == null) {
-                val signInResult = firebaseManager.signInWithGoogle(activityContext)
-                if (signInResult.isFailure) return@launch
-            }
-            repository.syncAllPlaylistsToFirebase()
-        }
-    }
-
     fun playTrack(track: PlayableTrack, queueList: List<PlayableTrack> = emptyList()) {
         playerManager.playTrack(track, queueList)
     }
@@ -137,18 +118,24 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun toggleLike(track: PlayableTrack) {
-        viewModelScope.launch {
-            repository.toggleLike(track)
-        }
+    fun playNext(track: PlayableTrack) {
+        playerManager.playNext(track)
     }
 
     fun addToQueue(track: PlayableTrack) {
         playerManager.addToQueue(track)
     }
 
-    fun playNext(track: PlayableTrack) {
-        playerManager.playNext(track)
+    fun toggleLike(track: PlayableTrack) {
+        viewModelScope.launch {
+            repository.toggleLike(track)
+        }
+    }
+
+    fun clearRecentlyPlayed() {
+        viewModelScope.launch {
+            repository.clearRecentlyPlayed()
+        }
     }
 
     private val _importState = MutableStateFlow<ImportPlaylistUiState>(ImportPlaylistUiState.Idle)
@@ -158,56 +145,30 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         _importState.value = ImportPlaylistUiState.Idle
     }
 
-    fun loadJioSaavnPlaylist(urlOrToken: String) {
-        val token = com.musicx.app.utils.PlaylistLinkParser.extractToken(urlOrToken) ?: urlOrToken.trim()
-        if (token.isBlank()) {
-            _importState.value = ImportPlaylistUiState.Error("Please enter a valid JioSaavn playlist link or token")
-            return
-        }
+    fun importPlaylistDirectly(tokenOrUrl: String) {
+        loadPlaylistToImport(tokenOrUrl)
+    }
 
+    fun loadPlaylistToImport(tokenOrUrl: String) {
+        if (tokenOrUrl.isBlank()) return
         viewModelScope.launch {
-            _importState.value = ImportPlaylistUiState.Loading(token)
-            when (val result = repository.fetchPlaylistByToken(token)) {
+            _importState.value = ImportPlaylistUiState.Loading(tokenOrUrl)
+            when (val res = repository.fetchPlaylistByToken(tokenOrUrl)) {
                 is com.example.data.remote.NetworkResult.Success -> {
-                    _importState.value = ImportPlaylistUiState.Loaded(result.data)
+                    _importState.value = ImportPlaylistUiState.Loaded(res.data)
                 }
                 is com.example.data.remote.NetworkResult.Error -> {
-                    _importState.value = ImportPlaylistUiState.Error(result.message)
+                    _importState.value = ImportPlaylistUiState.Error(res.message)
                 }
                 is com.example.data.remote.NetworkResult.Loading -> {}
             }
         }
     }
 
-    fun importPlaylistDirectly(urlOrToken: String, onSaved: ((Long) -> Unit)? = null) {
-        val token = com.musicx.app.utils.PlaylistLinkParser.extractToken(urlOrToken) ?: urlOrToken.trim()
-        if (token.isBlank()) {
-            _importState.value = ImportPlaylistUiState.Error("Please enter a valid JioSaavn playlist link or token")
-            return
-        }
-
+    fun saveImportedPlaylist(playlist: com.example.data.model.Playlist) {
         viewModelScope.launch {
-            _importState.value = ImportPlaylistUiState.Loading(token)
-            when (val result = repository.fetchPlaylistByToken(token)) {
-                is com.example.data.remote.NetworkResult.Success -> {
-                    val playlist = result.data
-                    val localId = repository.importJioSaavnPlaylistToLocal(playlist)
-                    _importState.value = ImportPlaylistUiState.Saved(localId, playlist.title, playlist.songs.size)
-                    onSaved?.invoke(localId)
-                }
-                is com.example.data.remote.NetworkResult.Error -> {
-                    _importState.value = ImportPlaylistUiState.Error(result.message)
-                }
-                is com.example.data.remote.NetworkResult.Loading -> {}
-            }
-        }
-    }
-
-    fun saveImportedPlaylistToLibrary(playlist: com.example.data.model.Playlist, onSaved: (Long) -> Unit) {
-        viewModelScope.launch {
-            val localId = repository.importJioSaavnPlaylistToLocal(playlist)
-            _importState.value = ImportPlaylistUiState.Saved(localId, playlist.title, playlist.songs.size)
-            onSaved(localId)
+            val id = repository.importJioSaavnPlaylistToLocal(playlist)
+            _importState.value = ImportPlaylistUiState.Saved(id, playlist.title, playlist.songs.size)
         }
     }
 }

@@ -823,7 +823,9 @@ fun NowPlayingModal(
             queue = queue,
             currentIndex = currentIndex,
             isPlaying = isPlaying,
+            isShuffleEnabled = isShuffle,
             isAutoplayEnabled = isAutoplayEnabled,
+            onToggleShuffle = { playerManager.toggleShuffle() },
             onToggleAutoplay = { playerManager.setAutoplayEnabled(!isAutoplayEnabled) },
             onLoadMoreRecommendations = {
                 playerManager.loadMoreRecommendations()
@@ -1597,13 +1599,13 @@ fun ImmersivePosterNowPlayingLayout(
                     }
                 }
 
-                // Play / Pause (Small Rounding Center Pill, White Shape)
+                // Play / Stop (Square when playing, Round when stopped/paused, with PLAY/STOP text)
                 Surface(
                     onClick = onPlayPause,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = if (isPlaying) RoundedCornerShape(12.dp) else CircleShape,
                     color = Color.White,
                     shadowElevation = 12.dp,
-                    modifier = Modifier.size(width = 86.dp, height = 64.dp)
+                    modifier = Modifier.size(width = 96.dp, height = 64.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (isBuffering) {
@@ -1613,12 +1615,26 @@ fun ImmersivePosterNowPlayingLayout(
                                 strokeWidth = 3.dp
                             )
                         } else {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Rounded.Pause else AppIcons.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = Color(0xFF0F1115),
-                                modifier = Modifier.size(36.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Rounded.Stop else AppIcons.PlayArrow,
+                                    contentDescription = if (isPlaying) "Stop" else "Play",
+                                    tint = Color(0xFF0F1115),
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Text(
+                                    text = if (isPlaying) "STOP" else "PLAY",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F1115),
+                                        fontSize = 12.sp,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -1710,15 +1726,10 @@ fun ImmersivePosterNowPlayingLayout(
                     }
                 }
 
-                // Real-time Audio Output Device Pill - Small Start Rounding + End Rounding, White Shape
+                // Real-time Audio Output Device / Speaker Pill - Round up-down capsule shape
                 Surface(
                     onClick = onOpenDeviceSelector,
-                    shape = RoundedCornerShape(
-                        topStart = 6.dp,
-                        bottomStart = 6.dp,
-                        topEnd = 22.dp,
-                        bottomEnd = 22.dp
-                    ),
+                    shape = RoundedCornerShape(22.dp),
                     color = Color.White,
                     shadowElevation = 6.dp,
                     modifier = Modifier
@@ -3030,7 +3041,9 @@ fun QueueBottomSheet(
     queue: List<PlayableTrack>,
     currentIndex: Int,
     isPlaying: Boolean = true,
+    isShuffleEnabled: Boolean = false,
     isAutoplayEnabled: Boolean = true,
+    onToggleShuffle: () -> Unit = {},
     onToggleAutoplay: () -> Unit = {},
     onLoadMoreRecommendations: () -> Unit = {},
     onDismiss: () -> Unit,
@@ -3068,6 +3081,23 @@ fun QueueBottomSheet(
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = onToggleShuffle,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isShuffleEnabled) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = "Shuffle Queue",
+                            tint = if (isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     if (queue.isNotEmpty()) {
                         TextButton(onClick = onClearQueue) {
                             Text("Clear", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)

@@ -141,22 +141,20 @@ class ThemeManager private constructor(context: Context) {
     )
     val isDynamicSongThemeEnabled: StateFlow<Boolean> = _isDynamicSongThemeEnabled.asStateFlow()
 
-    private val _contentProvider = MutableStateFlow(
-        com.example.data.model.ContentProvider.fromId(
-            prefs.getString(KEY_CONTENT_PROVIDER, com.example.data.model.ContentProvider.JIO_SAAVN.id)
-        )
-    )
-    val contentProvider: StateFlow<com.example.data.model.ContentProvider> = _contentProvider.asStateFlow()
-
     private val _accentPalette = MutableStateFlow(
         AccentPalette.fromId(prefs.getString(KEY_ACCENT_PALETTE, AccentPalette.VIOLET.id) ?: AccentPalette.VIOLET.id)
     )
     val accentPalette: StateFlow<AccentPalette> = _accentPalette.asStateFlow()
 
     private val _fontOption = MutableStateFlow(
-        FontOption.fromId(prefs.getString(KEY_FONT_OPTION, FontOption.PLUS_JAKARTA_SANS.id) ?: FontOption.PLUS_JAKARTA_SANS.id)
+        FontOption.fromId(prefs.getString(KEY_FONT_OPTION, FontOption.FREDOKA_REGULAR.id) ?: FontOption.FREDOKA_REGULAR.id)
     )
     val fontOption: StateFlow<FontOption> = _fontOption.asStateFlow()
+
+    private val _useDeviceFont = MutableStateFlow(
+        prefs.getBoolean(KEY_USE_DEVICE_FONT, false)
+    )
+    val useDeviceFont: StateFlow<Boolean> = _useDeviceFont.asStateFlow()
 
     private val _nowPlayingStyle = MutableStateFlow(
         NowPlayingStyle.fromId(prefs.getString(KEY_NOW_PLAYING_STYLE, NowPlayingStyle.IMMERSIVE_POSTER.id) ?: NowPlayingStyle.IMMERSIVE_POSTER.id)
@@ -213,11 +211,6 @@ class ThemeManager private constructor(context: Context) {
         prefs.edit().putBoolean(KEY_DYNAMIC_SONG_THEME, enabled).apply()
     }
 
-    fun setContentProvider(provider: com.example.data.model.ContentProvider) {
-        _contentProvider.value = provider
-        prefs.edit().putString(KEY_CONTENT_PROVIDER, provider.id).apply()
-    }
-
     fun setAccentPalette(palette: AccentPalette) {
         _accentPalette.value = palette
         prefs.edit().putString(KEY_ACCENT_PALETTE, palette.id).apply()
@@ -226,6 +219,11 @@ class ThemeManager private constructor(context: Context) {
     fun setFontOption(font: FontOption) {
         _fontOption.value = font
         prefs.edit().putString(KEY_FONT_OPTION, font.id).apply()
+    }
+
+    fun setUseDeviceFont(enabled: Boolean) {
+        _useDeviceFont.value = enabled
+        prefs.edit().putBoolean(KEY_USE_DEVICE_FONT, enabled).apply()
     }
 
     fun setNowPlayingStyle(style: NowPlayingStyle) {
@@ -283,9 +281,9 @@ class ThemeManager private constructor(context: Context) {
         private const val KEY_LIQUID_GLASS_ENABLED = "key_liquid_glass_enabled"
         private const val KEY_DYNAMIC_SONG_BACKGROUND = "key_dynamic_song_background"
         private const val KEY_DYNAMIC_SONG_THEME = "key_dynamic_song_theme_v1"
-        private const val KEY_CONTENT_PROVIDER = "key_content_provider_v1"
         private const val KEY_ACCENT_PALETTE = "key_accent_palette"
-        private const val KEY_FONT_OPTION = "key_font_option_v2"
+        private const val KEY_FONT_OPTION = "key_font_option_v3"
+        private const val KEY_USE_DEVICE_FONT = "key_use_device_font"
         private const val KEY_NOW_PLAYING_STYLE = "key_now_playing_style"
         private const val KEY_USER_NICKNAME = "key_user_nickname"
         private const val KEY_USER_AVATAR_EMOJI = "key_user_avatar_emoji"

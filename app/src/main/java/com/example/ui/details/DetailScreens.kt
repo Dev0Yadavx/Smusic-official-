@@ -243,7 +243,7 @@ fun AlbumDetailScreen(
                         }
                     }
 
-                    // YouTube Music Style Action Bar Row
+                    // Action Bar Row (Play, Shuffle, Like, Share)
                     item {
                         LazyRow(
                             modifier = Modifier
@@ -594,9 +594,6 @@ fun PlaylistDetailScreen(
                 val blurArtwork = remember(previewArtworks, playlist.artwork) {
                     previewArtworks.firstOrNull() ?: playlist.artwork
                 }
-                val firebaseManager = remember { com.example.data.remote.FirebasePlaylistManager.getInstance(context) }
-                val isSyncingCloud by firebaseManager.isSyncing.collectAsState()
-                var isCloudSyncedState by remember(playlist.isCloudSynced) { mutableStateOf(playlist.isCloudSynced) }
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -766,43 +763,30 @@ fun PlaylistDetailScreen(
                                     )
                                 }
 
-                                // Sync Playlist to Firebase Cloud + Local Library
+                                // Save / Import Playlist to Local Library
+                                var isSavedToLibrary by remember { mutableStateOf(false) }
                                 IconButton(
                                     onClick = {
                                         scope.launch {
-                                            if (firebaseManager.currentUser.value == null) {
-                                                firebaseManager.signInWithGoogle(context)
-                                            }
                                             if (!playlistId.startsWith("local_")) {
                                                 repository.importJioSaavnPlaylistToLocal(playlist)
-                                            } else {
-                                                firebaseManager.syncPlaylistToCloud(playlist, notifyUser = true)
                                             }
-                                            isCloudSyncedState = true
-                                            Toast.makeText(context, "Playlist synced to Firebase & Library", Toast.LENGTH_SHORT).show()
+                                            isSavedToLibrary = true
+                                            Toast.makeText(context, "Playlist saved to Library", Toast.LENGTH_SHORT).show()
                                         }
                                     },
-                                    enabled = !isSyncingCloud,
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                        .testTag("playlist_firebase_sync_button")
+                                        .testTag("playlist_save_button")
                                 ) {
-                                    if (isSyncingCloud) {
-                                        CircularProgressIndicator(
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = if (isCloudSyncedState) Icons.Rounded.CloudDone else Icons.Rounded.CloudUpload,
-                                            contentDescription = "Sync to Firebase Cloud",
-                                            tint = if (isCloudSyncedState) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = if (isSavedToLibrary) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                                        contentDescription = "Save to Library",
+                                        tint = if (isSavedToLibrary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(22.dp)
+                                    )
                                 }
                             }
 
@@ -1226,7 +1210,7 @@ fun ArtistDetailScreen(
                         }
                     }
 
-                    // Authentic YouTube Music Action Bar Row
+                    // Action Bar Row (Follow, Shuffle, Radio)
                     item {
                         val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
                         Row(
@@ -1236,7 +1220,7 @@ fun ArtistDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // YouTube Music Subscribe Pill Button
+                            // Artist Follow Pill Button
                             Button(
                                 onClick = { isFollowing = !isFollowing },
                                 shape = RoundedCornerShape(24.dp),
@@ -1245,7 +1229,7 @@ fun ArtistDetailScreen(
                                     contentColor = if (isFollowing) MaterialTheme.colorScheme.onSurfaceVariant else if (isDark) Color.Black else Color.White
                                 ),
                                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
-                                modifier = Modifier.testTag("artist_subscribe_button")
+                                modifier = Modifier.testTag("artist_follow_button")
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -1253,18 +1237,24 @@ fun ArtistDetailScreen(
                                 ) {
                                     if (isFollowing) {
                                         Icon(
-                                            imageVector = Icons.Rounded.NotificationsActive,
+                                            imageVector = Icons.Rounded.Favorite,
                                             contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(17.dp)
                                         )
                                         Text(
-                                            text = "Subscribed",
+                                            text = "Following",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
                                         )
                                     } else {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FavoriteBorder,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(17.dp)
+                                        )
                                         Text(
-                                            text = "Subscribe",
+                                            text = "Follow",
                                             fontWeight = FontWeight.ExtraBold,
                                             fontSize = 13.sp
                                         )
@@ -1400,7 +1390,7 @@ fun ArtistDetailScreen(
                         }
                     }
 
-                    // Section 3: About the Artist Bio Card (YouTube Music style)
+                    // Section 3: About the Artist Bio Card
                     item {
                         Column(
                             modifier = Modifier
@@ -1423,7 +1413,7 @@ fun ArtistDetailScreen(
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
-                                        text = "${artist.name} is featured on YouTube Music with ${artist.topSongs.size} popular tracks.",
+                                        text = "${artist.name} on SMusic with ${artist.topSongs.size} popular tracks.",
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontSize = 14.sp,
                                             lineHeight = 20.sp

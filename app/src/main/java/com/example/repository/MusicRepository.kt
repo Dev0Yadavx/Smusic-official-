@@ -38,12 +38,9 @@ class MusicRepository(
     // Cached home shelves for instant startup & offline support
     @Volatile
     private var cachedShelves: List<MusicShelf> = emptyList()
-    @Volatile
-    private var cachedProvider: ContentProvider? = null
 
     fun invalidateCache() {
         cachedShelves = emptyList()
-        cachedProvider = null
     }
 
     /**
@@ -52,26 +49,8 @@ class MusicRepository(
     fun getHomeContent(languages: String = "hindi,english,punjabi,bhojpuri,haryanvi"): Flow<NetworkResult<List<MusicShelf>>> = flow {
         emit(NetworkResult.Loading)
 
-        val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-        if (cachedProvider != provider) {
-            cachedShelves = emptyList()
-            cachedProvider = provider
-        } else if (cachedShelves.isNotEmpty()) {
+        if (cachedShelves.isNotEmpty()) {
             emit(NetworkResult.Success(cachedShelves))
-        }
-
-        if (provider == ContentProvider.YT_MUSIC) {
-            try {
-                val ytShelves = com.example.data.remote.YouTubeMusicProvider.getHomeShelves(languages)
-                if (ytShelves.isNotEmpty()) {
-                    cachedShelves = ytShelves
-                    cachedProvider = ContentProvider.YT_MUSIC
-                    emit(NetworkResult.Success(ytShelves))
-                    return@flow
-                }
-            } catch (e: Exception) {
-                Log.w(tag, "YT Music home shelves fallback to JioSaavn: ${e.message}")
-            }
         }
 
         try {
@@ -79,7 +58,6 @@ class MusicRepository(
             if (response.isSuccessful && response.body() != null) {
                 val shelves = HomeMapper.map(response.body()!!)
                 cachedShelves = shelves
-                cachedProvider = provider
                 emit(NetworkResult.Success(shelves))
             } else {
                 if (cachedShelves.isEmpty()) {
@@ -99,134 +77,105 @@ class MusicRepository(
     /**
      * Search songs
      */
-     suspend fun searchSongs(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Song>> = withContext(Dispatchers.IO) {
-         try {
-             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-             if (provider == ContentProvider.YT_MUSIC) {
-                 val ytSongs = com.example.data.remote.YouTubeMusicProvider.searchSongs(query)
-                 if (ytSongs.isNotEmpty()) {
-                     return@withContext NetworkResult.Success(ytSongs)
-                 }
-             }
-
-             val response = api.searchSongs(query = query, page = page, limit = limit)
-             if (response.isSuccessful && response.body() != null) {
-                 val resultsArr = response.body()!!.getAsJsonArray("results")
-                 val songs = SongMapper.mapList(resultsArr)
-                 NetworkResult.Success(songs)
-             } else {
-                 NetworkResult.Error("Search failed: ${response.message()}")
-             }
-         } catch (e: CancellationException) {
-             throw e
-         } catch (e: Exception) {
-             NetworkResult.Error(e.message ?: "Unknown search error", e)
-         }
-     }
+    suspend fun searchSongs(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Song>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.searchSongs(query = query, page = page, limit = limit)
+            if (response.isSuccessful && response.body() != null) {
+                val resultsArr = response.body()!!.getAsJsonArray("results")
+                val songs = SongMapper.mapList(resultsArr)
+                NetworkResult.Success(songs)
+            } else {
+                NetworkResult.Error("Search failed: ${response.message()}")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Unknown search error", e)
+        }
+    }
 
     /**
      * Search albums
      */
-     suspend fun searchAlbums(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Album>> = withContext(Dispatchers.IO) {
-         try {
-             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-             if (provider == ContentProvider.YT_MUSIC) {
-                 val ytAlbums = com.example.data.remote.YouTubeMusicProvider.searchAlbums(query)
-                 if (ytAlbums.isNotEmpty()) {
-                     return@withContext NetworkResult.Success(ytAlbums)
-                 }
-             }
-             val response = api.searchAlbums(query = query, page = page, limit = limit)
-             if (response.isSuccessful && response.body() != null) {
-                 val resultsArr = response.body()!!.getAsJsonArray("results")
-                 val albums = AlbumMapper.mapList(resultsArr)
-                 NetworkResult.Success(albums)
-             } else {
-                 NetworkResult.Error("Album search failed")
-             }
-         } catch (e: CancellationException) {
-             throw e
-         } catch (e: Exception) {
-             NetworkResult.Error(e.message ?: "Album search error", e)
-         }
-     }
+    suspend fun searchAlbums(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Album>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.searchAlbums(query = query, page = page, limit = limit)
+            if (response.isSuccessful && response.body() != null) {
+                val resultsArr = response.body()!!.getAsJsonArray("results")
+                val albums = AlbumMapper.mapList(resultsArr)
+                NetworkResult.Success(albums)
+            } else {
+                NetworkResult.Error("Album search failed")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Album search error", e)
+        }
+    }
 
     /**
      * Search playlists
      */
-     suspend fun searchPlaylists(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Playlist>> = withContext(Dispatchers.IO) {
-         try {
-             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-             if (provider == ContentProvider.YT_MUSIC) {
-                 val ytPlaylists = com.example.data.remote.YouTubeMusicProvider.searchPlaylists(query)
-                 if (ytPlaylists.isNotEmpty()) {
-                     return@withContext NetworkResult.Success(ytPlaylists)
-                 }
-             }
-             val response = api.searchPlaylists(query = query, page = page, limit = limit)
-             if (response.isSuccessful && response.body() != null) {
-                 val resultsArr = response.body()!!.getAsJsonArray("results")
-                 val playlists = PlaylistMapper.mapList(resultsArr)
-                 NetworkResult.Success(playlists)
-             } else {
-                 NetworkResult.Error("Playlist search failed")
-             }
-         } catch (e: CancellationException) {
-             throw e
-         } catch (e: Exception) {
-             NetworkResult.Error(e.message ?: "Playlist search error", e)
-         }
-     }
+    suspend fun searchPlaylists(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Playlist>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.searchPlaylists(query = query, page = page, limit = limit)
+            if (response.isSuccessful && response.body() != null) {
+                val resultsArr = response.body()!!.getAsJsonArray("results")
+                val playlists = PlaylistMapper.mapList(resultsArr)
+                NetworkResult.Success(playlists)
+            } else {
+                NetworkResult.Error("Playlist search failed")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Playlist search error", e)
+        }
+    }
 
     /**
      * Search artists
      */
-     suspend fun searchArtists(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Artist>> = withContext(Dispatchers.IO) {
-         try {
-             val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-             if (provider == ContentProvider.YT_MUSIC) {
-                 val ytArtists = com.example.data.remote.YouTubeMusicProvider.searchArtists(query)
-                 if (ytArtists.isNotEmpty()) {
-                     return@withContext NetworkResult.Success(ytArtists)
-                 }
-             }
-             val response = api.searchArtists(query = query, page = page, limit = limit)
-             if (response.isSuccessful && response.body() != null) {
-                 val body = response.body()!!
-                 val resultsArr = body.getAsJsonArray("results")
-                     ?: body.getAsJsonArray("data")
-                     ?: body.getAsJsonObject("artists")?.getAsJsonArray("data")
-                 val artists = ArtistMapper.mapList(resultsArr)
-                 if (artists.isNotEmpty()) {
-                     return@withContext NetworkResult.Success(artists)
-                 }
-             }
+    suspend fun searchArtists(query: String, page: Int = 1, limit: Int = 500): NetworkResult<List<Artist>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.searchArtists(query = query, page = page, limit = limit)
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                val resultsArr = body.getAsJsonArray("results")
+                    ?: body.getAsJsonArray("data")
+                    ?: body.getAsJsonObject("artists")?.getAsJsonArray("data")
+                val artists = ArtistMapper.mapList(resultsArr)
+                if (artists.isNotEmpty()) {
+                    return@withContext NetworkResult.Success(artists)
+                }
+            }
 
-             // Fast fallback: autocomplete artists
-             val ac = getAutocomplete(query)
-             if (ac.artists.isNotEmpty()) {
-                 return@withContext NetworkResult.Success(ac.artists)
-             }
+            // Fast fallback: autocomplete artists
+            val ac = getAutocomplete(query)
+            if (ac.artists.isNotEmpty()) {
+                return@withContext NetworkResult.Success(ac.artists)
+            }
 
-             // Single direct artist fallback with original DP
-             val directDp = ArtistDpManager.getOriginalDp(query)
-             if (directDp.isNotBlank()) {
-                 val directArtist = Artist(
-                     id = query,
-                     name = query,
-                     image = directDp,
-                     role = "Artist"
-                 )
-                 return@withContext NetworkResult.Success(listOf(directArtist))
-             }
+            // Single direct artist fallback with original DP
+            val directDp = ArtistDpManager.getOriginalDp(query)
+            if (directDp.isNotBlank()) {
+                val directArtist = Artist(
+                    id = query,
+                    name = query,
+                    image = directDp,
+                    role = "Artist"
+                )
+                return@withContext NetworkResult.Success(listOf(directArtist))
+            }
 
-             NetworkResult.Error("Artist search failed")
-         } catch (e: CancellationException) {
-             throw e
-         } catch (e: Exception) {
-             NetworkResult.Error(e.message ?: "Artist search error", e)
-         }
-     }
+            NetworkResult.Error("Artist search failed")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Artist search error", e)
+        }
+    }
 
     /**
      * Autocomplete suggestions
@@ -269,18 +218,6 @@ class MusicRepository(
         artworkFallback: String = ""
     ): NetworkResult<Album> = withContext(Dispatchers.IO) {
         try {
-            val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-            if (provider == ContentProvider.YT_MUSIC || albumId.startsWith("yt_")) {
-                val ytAlbum = com.example.data.remote.YouTubeMusicProvider.getAlbumDetails(
-                    albumIdOrTitle = albumId,
-                    fallbackTitle = titleFallback,
-                    fallbackArtist = artistFallback
-                )
-                if (ytAlbum != null && ytAlbum.songs.isNotEmpty()) {
-                    return@withContext NetworkResult.Success(ytAlbum)
-                }
-            }
-
             var album: Album? = null
             val isNumeric = albumId.all { it.isDigit() }
 
@@ -344,7 +281,7 @@ class MusicRepository(
                 }
             }
 
-            // 5. Fallback: Search by title query (e.g. "Aara Ke Sara")
+            // 5. Fallback: Search by title query
             if (album == null && titleFallback.isNotBlank()) {
                 val cleanTitle = titleFallback.replace(Regex("\\(From [^)]*\\)"), "").trim()
                 val searchResult = searchSongs(cleanTitle)
@@ -382,24 +319,7 @@ class MusicRepository(
      */
     suspend fun getPlaylistDetails(playlistId: String): NetworkResult<Playlist> = withContext(Dispatchers.IO) {
         try {
-            val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-            if (provider == ContentProvider.YT_MUSIC || playlistId.startsWith("yt_")) {
-                val ytPlaylist = com.example.data.remote.YouTubeMusicProvider.getPlaylistDetails(playlistId)
-                if (ytPlaylist != null && ytPlaylist.songs.isNotEmpty()) {
-                    return@withContext NetworkResult.Success(ytPlaylist)
-                }
-            }
-
-            // 1. Check if this is a Firebase Cloud playlist
-            if (playlistId.startsWith("firebase_")) {
-                val cloudPl = com.example.data.remote.FirebasePlaylistManager.getInstance(context)
-                    .getCachedCloudPlaylist(playlistId)
-                if (cloudPl != null) {
-                    return@withContext NetworkResult.Success(cloudPl)
-                }
-            }
-
-            // 2. Check if this is a local user playlist
+            // Check if this is a local user playlist
             if (playlistId.startsWith("local_")) {
                 val localId = playlistId.removePrefix("local_").toLongOrNull()
                 if (localId != null) {
@@ -458,7 +378,6 @@ class MusicRepository(
                 }
             }
 
-            // If we have a playlist with a numeric listid and relatively few songs compared to songCount, try playlist.getDetails
             if (playlist != null && playlist.id.isNotBlank() && playlist.id.all { it.isDigit() } && playlist.id != playlistId) {
                 try {
                     val detailResp = api.getPlaylistDetails(listId = playlist.id, n = 1000)
@@ -490,14 +409,6 @@ class MusicRepository(
      */
     suspend fun getArtistDetails(artistId: String, songLimit: Int = 500, albumLimit: Int = 500): NetworkResult<Artist> = withContext(Dispatchers.IO) {
         try {
-            val provider = com.example.ui.theme.ThemeManager.getInstance(context).contentProvider.value
-            if (provider == ContentProvider.YT_MUSIC || artistId.startsWith("yt_")) {
-                val ytArtist = com.example.data.remote.YouTubeMusicProvider.getArtistDetails(artistId)
-                if (ytArtist != null && ytArtist.topSongs.isNotEmpty()) {
-                    return@withContext NetworkResult.Success(ytArtist)
-                }
-            }
-
             if (artistId.all { it.isDigit() }) {
                 val response = api.getArtistDetails(artistId = artistId, nSong = songLimit, nAlbum = albumLimit, limit = songLimit)
                 if (response.isSuccessful && response.body() != null) {
@@ -548,224 +459,127 @@ class MusicRepository(
                         id = artistId,
                         name = artistId,
                         image = fallbackImg,
-                        role = "Featured Artist",
+                        role = "Artist",
                         topSongs = songs,
                         topAlbums = emptyList()
                     )
                 )
             }
 
-            NetworkResult.Error("Failed to load artist details")
+            NetworkResult.Error("Artist details not found")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            NetworkResult.Error(e.message ?: "Failed to load artist", e)
+            NetworkResult.Error(e.message ?: "Artist error", e)
         }
     }
 
     /**
-     * Helper to safely extract a Song JsonObject from either a JsonArray or JsonObject payload
+     * Song details (supports numeric PID, encrypted ID token, and string token fallbacks)
      */
-    private fun extractSongJsonObject(element: JsonElement): JsonObject? {
-        if (element.isJsonArray) {
-            val arr = element.asJsonArray
-            for (i in 0 until arr.size()) {
-                val item = arr.get(i)
-                if (item.isJsonObject) {
-                    val obj = item.asJsonObject
-                    if (obj.has("id") || obj.has("song") || obj.has("title") || obj.has("token")) {
-                        return obj
-                    }
+    suspend fun getSongDetails(songIdOrToken: String): Song? = withContext(Dispatchers.IO) {
+        try {
+            if (songIdOrToken.isBlank()) return@withContext null
+            val isNumeric = songIdOrToken.all { it.isDigit() }
+
+            if (isNumeric) {
+                val response = api.getSongByPid(pid = songIdOrToken)
+                if (response.isSuccessful && response.body() != null) {
+                    val body = response.body()!!
+                    val parsed = parseSongFromJsonElement(body, songIdOrToken)
+                    if (parsed != null) return@withContext parsed
                 }
             }
-            if (arr.size() > 0 && arr.get(0).isJsonObject) {
-                return arr.get(0).asJsonObject
+
+            val tokenResponse = api.getSongByToken(token = songIdOrToken)
+            if (tokenResponse.isSuccessful && tokenResponse.body() != null) {
+                val body = tokenResponse.body()!!
+                val parsed = parseSongFromJsonElement(body, songIdOrToken)
+                if (parsed != null) return@withContext parsed
             }
-            return null
+
+            // Fallback: searchSongs by ID or query
+            val search = api.searchSongs(query = songIdOrToken, limit = 5)
+            if (search.isSuccessful && search.body() != null) {
+                val arr = search.body()!!.getAsJsonArray("results")
+                val songs = SongMapper.mapList(arr)
+                val matched = songs.firstOrNull { it.id == songIdOrToken || it.token == songIdOrToken } ?: songs.firstOrNull()
+                if (matched != null) return@withContext matched
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Song detail fetch error for $songIdOrToken: ${e.message}")
         }
-        if (element.isJsonObject) {
-            val obj = element.asJsonObject
-            val songsArr = obj.getAsJsonArray("songs") ?: obj.getAsJsonArray("results")
-            if (songsArr != null && songsArr.size() > 0) {
-                val first = songsArr.get(0)
-                if (first.isJsonObject) return first.asJsonObject
-            }
-            if (obj.has("id") || obj.has("song") || obj.has("title")) {
-                return obj
-            }
-            // Check if key is the song id with nested object:
-            for (entry in obj.entrySet()) {
-                if (entry.value.isJsonObject) {
-                    val inner = entry.value.asJsonObject
-                    if (inner.has("id") || inner.has("song") || inner.has("title")) {
-                        return inner
+        null
+    }
+
+    private fun parseSongFromJsonElement(element: JsonElement, fallbackId: String): Song? {
+        try {
+            if (element.isJsonObject) {
+                val obj = element.asJsonObject
+                if (obj.has(fallbackId)) {
+                    val inner = obj.getAsJsonObject(fallbackId)
+                    return SongMapper.map(inner)
+                }
+                if (obj.has("songs")) {
+                    val songsArr = obj.getAsJsonArray("songs")
+                    if (songsArr != null && songsArr.size() > 0) {
+                        return SongMapper.map(songsArr[0].asJsonObject)
                     }
                 }
+                if (obj.has("id") || obj.has("song") || obj.has("title")) {
+                    return SongMapper.map(obj)
+                }
+            } else if (element.isJsonArray) {
+                val arr = element.asJsonArray
+                if (arr.size() > 0 && arr[0].isJsonObject) {
+                    return SongMapper.map(arr[0].asJsonObject)
+                }
             }
-            return obj
+        } catch (e: Exception) {
+            Log.w(tag, "parseSongFromJsonElement error: ${e.message}")
         }
         return null
     }
 
     /**
-     * Song details (with numeric PID and string Token fallback)
-     */
-    suspend fun getSongDetails(songId: String): Song? = withContext(Dispatchers.IO) {
-        try {
-            // First try by PID if numeric, otherwise try by Token
-            val response = if (songId.all { it.isDigit() }) {
-                api.getSongByPid(pid = songId)
-            } else {
-                api.getSongByToken(token = songId)
-            }
-            if (response.isSuccessful && response.body() != null) {
-                val songObj = extractSongJsonObject(response.body()!!)
-                if (songObj != null) {
-                    return@withContext SongMapper.map(songObj)
-                }
-            }
-            // Fallback: try the other method if first returned empty
-            if (songId.all { it.isDigit() }) {
-                val fallbackResp = api.getSongByToken(token = songId)
-                if (fallbackResp.isSuccessful && fallbackResp.body() != null) {
-                    val songObj = extractSongJsonObject(fallbackResp.body()!!)
-                    if (songObj != null) {
-                        return@withContext SongMapper.map(songObj)
-                    }
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e(tag, "Song details error: ${e.message}")
-        }
-        null
-    }
-
-    /**
-     * Recommendations / Autoplay next songs (Endless Radio Engine)
+     * Get auto-play recommendations
      */
     suspend fun getRecommendations(songId: String, currentTrack: PlayableTrack? = null): List<Song> = withContext(Dispatchers.IO) {
-        val targetPid = if (songId.all { it.isDigit() }) {
-            songId
-        } else {
-            // Lookup numeric PID from token / custom ID
-            val details = getSongDetails(songId)
-            details?.id?.takeIf { it.all { ch -> ch.isDigit() } } ?: songId
-        }
-
-        if (targetPid.isNotBlank()) {
-            try {
-                // 1. Direct Recommendation Queue
-                val response = api.getRecommendations(pid = targetPid)
-                if (response.isSuccessful && response.body() != null) {
-                    val songs = RecommendationMapper.map(response.body()!!)
-                    if (songs.isNotEmpty()) {
-                        return@withContext songs.filter { it.id != targetPid }
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(tag, "Direct recommendation error for pid $targetPid: ${e.message}")
-            }
-
-            try {
-                // 2. AutoPlay queue fallback
-                val autoPlayResp = api.getAutoPlayQueue(songId = targetPid)
-                if (autoPlayResp.isSuccessful && autoPlayResp.body() != null) {
-                    val songs = RecommendationMapper.map(autoPlayResp.body()!!)
-                    if (songs.isNotEmpty()) {
-                        return@withContext songs.filter { it.id != targetPid }
-                    }
-                }
-            } catch (_: Exception) {}
-
-            try {
-                // 3. WebRadio Station fallback
-                val radioResp = api.createRadioStation(entityId = targetPid)
-                if (radioResp.isSuccessful && radioResp.body() != null) {
-                    val radioObj = radioResp.body()!!.let { if (it.isJsonObject) it.asJsonObject else null }
-                    val stationId = radioObj?.get("stationid")?.asString
-                    if (!stationId.isNullOrBlank()) {
-                        val stationSongsResp = api.getRadioSongs(stationId = stationId, count = 25)
-                        if (stationSongsResp.isSuccessful && stationSongsResp.body() != null) {
-                            val stationSongs = RecommendationMapper.map(stationSongsResp.body()!!)
-                            if (stationSongs.isNotEmpty()) {
-                                return@withContext stationSongs.filter { it.id != targetPid }
-                            }
-                        }
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-
-        // 4. Artist top songs fallback for high-relevance radio continuation
-        val artistQuery = currentTrack?.artist ?: ""
-        if (artistQuery.isNotBlank() && !artistQuery.equals("Unknown", ignoreCase = true) && !artistQuery.equals("Various Artists", ignoreCase = true)) {
-            try {
-                val primaryArtist = artistQuery.split(",", "&", "feat.", "ft.").firstOrNull()?.trim() ?: artistQuery
-                val artistSearchResult = searchSongs(query = primaryArtist, limit = 25)
-                if (artistSearchResult is NetworkResult.Success && artistSearchResult.data.isNotEmpty()) {
-                    val filtered = artistSearchResult.data.filter { it.id != targetPid && it.id != songId }
-                    if (filtered.isNotEmpty()) {
-                        return@withContext filtered
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-
-        // 5. Final fallback: use trending songs or cached home shelf if available
-        val trendingSongs = cachedShelves.firstOrNull { it.id == "trending" || it.id.contains("trending", ignoreCase = true) }
-            ?.items?.mapNotNull { if (it is ShelfItem.SongItem) it.song else null }
-            ?.filter { it.id != targetPid && it.id != songId }
-            ?: emptyList()
-
-        if (trendingSongs.isNotEmpty()) {
-            return@withContext trendingSongs
-        }
-
-        // 6. If even cached is empty, query fresh home launch songs
         try {
-            val homeLaunch = api.getHomeLaunch()
-            if (homeLaunch.isSuccessful && homeLaunch.body() != null) {
-                val shelves = HomeMapper.map(homeLaunch.body()!!)
-                val firstSongs = shelves.flatMap { shelf ->
-                    shelf.items.mapNotNull { if (it is ShelfItem.SongItem) it.song else null }
-                }.filter { it.id != targetPid && it.id != songId }
-                if (firstSongs.isNotEmpty()) {
-                    return@withContext firstSongs
+            if (songId.isNotBlank() && songId.all { it.isDigit() }) {
+                val response = api.getAutoPlayQueue(songId = songId)
+                if (response.isSuccessful && response.body() != null) {
+                    val body = response.body()!!
+                    val songs = if (body.isJsonArray) {
+                        SongMapper.mapList(body.asJsonArray)
+                    } else if (body.isJsonObject) {
+                        val obj = body.asJsonObject
+                        val arr = obj.getAsJsonArray("results") ?: obj.getAsJsonArray("data") ?: obj.getAsJsonArray("station")
+                        if (arr != null) SongMapper.mapList(arr) else emptyList()
+                    } else emptyList()
+
+                    if (songs.isNotEmpty()) {
+                        return@withContext songs.filter { it.id != songId }
+                    }
                 }
             }
-        } catch (_: Exception) {}
 
+            // Fallback: search artist songs for radio mix
+            if (currentTrack != null && currentTrack.artist.isNotBlank()) {
+                val cleanArtist = currentTrack.artist.split(",", "&", "ft.", "feat.").firstOrNull()?.trim() ?: currentTrack.artist
+                val artistSearch = api.searchSongs(query = cleanArtist, limit = 20)
+                if (artistSearch.isSuccessful && artistSearch.body() != null) {
+                    val arr = artistSearch.body()!!.getAsJsonArray("results")
+                    val songs = SongMapper.mapList(arr).filter { it.id != songId && it.title != currentTrack.title }
+                    if (songs.isNotEmpty()) {
+                        return@withContext songs
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Recommendations error: ${e.message}")
+        }
         emptyList()
-    }
-
-    /**
-     * Lyrics
-     */
-    suspend fun getLyrics(lyricsId: String, song: Song?): String = withContext(Dispatchers.IO) {
-        if (lyricsId.isNotBlank()) {
-            try {
-                val response = api.getLyrics(lyricsId = lyricsId)
-                val body = response.body()
-                if (response.isSuccessful && body != null) {
-                    val text = LyricsMapper.map(body)
-                    if (text.isNotBlank()) return@withContext text
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(tag, "Lyrics endpoint error: ${e.message}")
-            }
-        }
-
-        // Fallback to song's lyrics snippet if present
-        if (!song?.lyricsSnippet.isNullOrBlank()) {
-            return@withContext song!!.lyricsSnippet
-        }
-        "Lyrics not available for this song."
     }
 
     /**
@@ -775,7 +589,6 @@ class MusicRepository(
         track: PlayableTrack,
         quality: StreamUrlResolver.AudioQuality = StreamUrlResolver.AudioQuality.HIGH
     ): String? = withContext(Dispatchers.IO) {
-        println("[SMusic-Terminal] Resolving audio stream fallback for: '${track.title}' by '${track.artist}' (ID: ${track.id})")
         val cleanTitle = track.title
             .replace(Regex("\\[.*?\\]|\\(.*?\\)"), "")
             .replace(Regex("(?i)ft\\.?|feat\\.?|official|video|audio|lyrics|hd|4k"), "")
@@ -788,7 +601,6 @@ class MusicRepository(
 
         for (q in queries) {
             try {
-                println("[SMusic-Terminal] Searching audio match query: '$q'")
                 val searchRes = api.searchSongs(query = q, limit = 5)
                 if (searchRes.isSuccessful && searchRes.body() != null) {
                     val arr = searchRes.body()!!.getAsJsonArray("results")
@@ -799,45 +611,25 @@ class MusicRepository(
                             val matchTrack = match.toPlayableTrack()
                             val fallbackStream = StreamUrlResolver.resolve(matchTrack, quality)
                             if (!fallbackStream.isNullOrBlank()) {
-                                println("[SMusic-Terminal-SUCCESS] Audio stream resolved via match '${match.title}': $fallbackStream")
                                 return@withContext fallbackStream
                             }
                         }
                     }
                 }
-            } catch (e: Exception) {
-                println("[SMusic-Terminal-WARN] Fallback search error for query '$q': ${e.message}")
-            }
+            } catch (_: Exception) {}
         }
-        println("[SMusic-Terminal-ERROR] No fallback audio stream could be resolved for '${track.title}'")
         null
     }
 
     /**
-     * Stream URL resolution (with automatic details lookup and resilient audio engine fallback)
+     * Stream URL resolution
      */
     suspend fun resolveStreamUrl(
         track: PlayableTrack,
         quality: StreamUrlResolver.AudioQuality = StreamUrlResolver.AudioQuality.HIGH
     ): String? = withContext(Dispatchers.IO) {
-        println("[SMusic-Terminal] Starting stream URL resolution for: '${track.title}' (ID: ${track.id}, Source: ${track.source})")
-
-        if (track.id.startsWith("yt_") || track.source == TrackSource.YOUTUBE_MUSIC) {
-            val ytUrl = com.example.data.remote.YouTubeMusicProvider.resolveStreamUrl(track.id)
-            if (!ytUrl.isNullOrBlank()) {
-                println("[SMusic-Terminal-SUCCESS] Resolved direct YouTube Music stream for '${track.title}'")
-                return@withContext ytUrl
-            }
-            println("[SMusic-Terminal] Direct YouTube stream unavailable. Engaging high-fidelity audio stream fallback...")
-            val fallbackUrl = resolveAudioStreamFallback(track, quality)
-            if (!fallbackUrl.isNullOrBlank()) {
-                return@withContext fallbackUrl
-            }
-        }
-
         var resolved = StreamUrlResolver.resolve(track, quality)
         if (resolved.isNullOrBlank() && track.source != TrackSource.LOCAL && track.id.isNotBlank()) {
-            // Proactively query song details if track was generated without encrypted media URL
             val details = getSongDetails(track.id)
             if (details != null && details.encryptedMediaUrl.isNotBlank()) {
                 val updatedTrack = track.copy(
@@ -852,12 +644,6 @@ class MusicRepository(
 
         if (resolved.isNullOrBlank() && track.source != TrackSource.LOCAL) {
             resolved = resolveAudioStreamFallback(track, quality)
-        }
-
-        if (resolved != null) {
-            println("[SMusic-Terminal-SUCCESS] Final resolved stream URL for '${track.title}': $resolved")
-        } else {
-            println("[SMusic-Terminal-ERROR] Failed to resolve any stream URL for '${track.title}' (ID: ${track.id})")
         }
         resolved
     }
@@ -990,15 +776,12 @@ class MusicRepository(
         }.flowOn(Dispatchers.IO)
 
     suspend fun createPlaylist(name: String, description: String = "", artwork: String = ""): Long = withContext(Dispatchers.IO) {
-        val id = playlistDao.insertPlaylist(PlaylistEntity(name = name, description = description, artwork = artwork))
-        syncLocalPlaylistToFirebase(id, notifyUser = false)
-        id
+        playlistDao.insertPlaylist(PlaylistEntity(name = name, description = description, artwork = artwork))
     }
 
     suspend fun deletePlaylist(id: Long) = withContext(Dispatchers.IO) {
         playlistDao.deletePlaylist(id)
         playlistDao.deleteSongsByPlaylist(id)
-        com.example.data.remote.FirebasePlaylistManager.getInstance(context).deleteCloudPlaylist("local_$id")
     }
 
     fun getPlaylistSongs(playlistId: Long): Flow<List<PlayableTrack>> =
@@ -1021,62 +804,14 @@ class MusicRepository(
                 encryptedMediaUrl = track.encryptedMediaUrl
             )
         )
-        syncLocalPlaylistToFirebase(playlistId, notifyUser = false)
     }
 
     suspend fun removeSongFromPlaylist(playlistId: Long, songId: String) = withContext(Dispatchers.IO) {
         playlistDao.removeSongFromPlaylist(playlistId, songId)
-        syncLocalPlaylistToFirebase(playlistId, notifyUser = false)
-    }
-
-    suspend fun syncLocalPlaylistToFirebase(playlistId: Long, notifyUser: Boolean = true) = withContext(Dispatchers.IO) {
-        val entity = playlistDao.getPlaylistById(playlistId) ?: return@withContext
-        val songs = playlistDao.getSongsForPlaylistSync(playlistId).map { it.toSong() }
-        val previews = buildList {
-            songs.mapNotNull { it.artwork.takeIf { art -> art.isNotBlank() } }.distinct().take(4).forEach { add(it) }
-            if (entity.artwork.isNotBlank() && !contains(entity.artwork)) add(entity.artwork)
-        }.take(4)
-        val cloudPl = Playlist(
-            id = "local_${entity.id}",
-            title = entity.name.ifBlank { "SMusic Playlist" },
-            subtitle = "${songs.size} Songs",
-            description = entity.description,
-            artwork = entity.artwork.ifBlank { previews.firstOrNull() ?: "" },
-            previewArtworks = previews,
-            songCount = songs.size,
-            songs = songs,
-            isCloudSynced = true
-        )
-        com.example.data.remote.FirebasePlaylistManager.getInstance(context)
-            .syncPlaylistToCloud(cloudPl, notifyUser = notifyUser)
-    }
-
-    suspend fun syncAllPlaylistsToFirebase(): Int = syncAllLocalPlaylistsToFirebase()
-
-    suspend fun syncAllLocalPlaylistsToFirebase(): Int = withContext(Dispatchers.IO) {
-        val allLocal = playlistDao.getAllPlaylists().firstOrNull() ?: emptyList()
-        var syncedCount = 0
-        for (entity in allLocal) {
-            syncLocalPlaylistToFirebase(entity.id, notifyUser = false)
-            syncedCount++
-        }
-        // If user has no local playlists yet, also sync top playlists from cached shelves so Firebase has playlists
-        if (syncedCount == 0 && cachedShelves.isNotEmpty()) {
-            val topPl = cachedShelves
-                .flatMap { it.items }
-                .mapNotNull { (it as? ShelfItem.PlaylistItem)?.playlist }
-                .take(4)
-            for (pl in topPl) {
-                val ok = com.example.data.remote.FirebasePlaylistManager.getInstance(context)
-                    .syncPlaylistToCloud(pl, notifyUser = false)
-                if (ok) syncedCount++
-            }
-        }
-        syncedCount
     }
 
     /**
-     * Import a JioSaavn playlist into user's local Room playlists and Firebase Cloud
+     * Import a JioSaavn playlist into user's local Room playlists
      */
     suspend fun importJioSaavnPlaylistToLocal(playlist: Playlist): Long = withContext(Dispatchers.IO) {
         val primaryArt = playlist.artwork.ifBlank {
@@ -1106,15 +841,6 @@ class MusicRepository(
         if (entities.isNotEmpty()) {
             playlistDao.insertPlaylistSongs(entities)
         }
-        // Notify & sync to Firebase Cloud if signed in
-        com.example.player.SMusicNotificationHelper.showPlaylistSyncNotification(
-            context = context,
-            playlistId = "local_$playlistId",
-            playlistTitle = playlist.title.ifBlank { "SMusic Playlist" },
-            songCount = playlist.songs.size,
-            artworkUrl = primaryArt
-        )
-        syncLocalPlaylistToFirebase(playlistId, notifyUser = false)
         playlistId
     }
 
@@ -1193,7 +919,6 @@ class MusicRepository(
                         mediaId
                     )
 
-                    // Album art URI
                     val artworkUri = ContentUris.withAppendedId(
                         Uri.parse("content://media/external/audio/albumart"),
                         albumId
@@ -1218,5 +943,30 @@ class MusicRepository(
             Log.e(tag, "Local audio scan failed: ${e.message}", e)
         }
         tracks
+    }
+
+    /**
+     * Fetch lyrics by lyricsId or songId
+     */
+    suspend fun getLyrics(lyricsId: String?, songId: String? = null): String? = withContext(Dispatchers.IO) {
+        val targetId = when {
+            !lyricsId.isNullOrBlank() -> lyricsId
+            !songId.isNullOrBlank() -> songId
+            else -> return@withContext null
+        }
+        try {
+            val res = api.getLyrics(targetId)
+            if (res.isSuccessful) {
+                val body = res.body()
+                val elem = body?.get("lyrics")
+                val lyricsRaw = if (elem != null && !elem.isJsonNull) elem.asString else null
+                if (!lyricsRaw.isNullOrBlank()) {
+                    return@withContext lyricsRaw.replace("<br>", "\n").replace("<br/>", "\n")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to fetch lyrics: ${e.message}")
+        }
+        null
     }
 }

@@ -352,6 +352,22 @@ object RecommendationMapper {
 
 object HomeMapper {
 
+    private fun isExcludedModule(key: String, title: String): Boolean {
+        val lowerKey = key.lowercase()
+        val lowerTitle = title.lowercase()
+        return lowerKey.contains("radio") ||
+               lowerKey.contains("podcast") ||
+               lowerKey.contains("station") ||
+               lowerKey.contains("show") ||
+               lowerKey.contains("episode") ||
+               lowerKey.contains("channel") ||
+               lowerTitle.contains("radio") ||
+               lowerTitle.contains("podcast") ||
+               lowerTitle.contains("station") ||
+               lowerTitle.contains("show") ||
+               lowerTitle.contains("episode")
+    }
+
     fun map(json: JsonObject): List<MusicShelf> {
         val shelves = mutableListOf<MusicShelf>()
         val modules = json.getAsJsonObject("modules")
@@ -372,6 +388,7 @@ object HomeMapper {
         var dynamicCounter = 0
 
         fun processModule(key: String, defaultTitle: String, defaultSubtitle: String, defaultType: ShelfType? = null) {
+            if (isExcludedModule(key, defaultTitle)) return
             val elem = json.get(key) ?: return
             val arr = when {
                 elem.isJsonArray -> elem.asJsonArray
@@ -398,37 +415,40 @@ object HomeMapper {
             }
         }
 
-        // 1. Trending Now
-        processModule("new_trending", "Trending Now", "Hottest tracks and albums right now", ShelfType.SONG_HORIZONTAL)
+        // 1. Trending Now (Songs)
+        processModule("new_trending", "Trending Now", "Hottest tracks right now", ShelfType.SONG_HORIZONTAL)
 
         // 2. New Releases / Albums
         processModule("new_albums", "New Releases", "Fresh albums & singles", ShelfType.ALBUM_HORIZONTAL)
 
-        // 3. Top Playlists
+        // 3. Featured / Top Artists Profiles
+        processModule("artist_recos", "Top Artists", "Popular singers & performers", ShelfType.ARTIST_HORIZONTAL)
+        if (shelves.none { it.type == ShelfType.ARTIST_HORIZONTAL }) {
+            processModule("top_artists", "Top Artists", "Popular singers & performers", ShelfType.ARTIST_HORIZONTAL)
+        }
+        if (shelves.none { it.type == ShelfType.ARTIST_HORIZONTAL }) {
+            processModule("artists", "Top Artists", "Popular singers & performers", ShelfType.ARTIST_HORIZONTAL)
+        }
+
+        // 4. Top Playlists
         processModule("top_playlists", "Top Playlists", "Handcrafted for every vibe", ShelfType.PLAYLIST_HORIZONTAL)
 
-        // 4. Top Charts
+        // 5. Top Charts
         processModule("charts", "Top Charts", "Leading music countdowns", ShelfType.PLAYLIST_HORIZONTAL)
-
-        // 5. Featured / Top Artists
-        processModule("artist_recos", "Top Artists", "Popular singers & performers", ShelfType.ARTIST_HORIZONTAL)
 
         // 6. City / Regional Hits
         processModule("city_mod", "City Hits", "Trending music in your city & region", ShelfType.PLAYLIST_HORIZONTAL)
 
-        // 7. Live Radio & Stations
-        processModule("radio", "Live Radio & Stations", "Non-stop music by mood & genre", ShelfType.PLAYLIST_HORIZONTAL)
-
-        // 8. Discover & Explore
+        // 7. Discover & Explore
         processModule("browse_discover", "Discover & Explore", "Handpicked gems and editorial selections", ShelfType.PLAYLIST_HORIZONTAL)
 
-        // 9. Mood & Genre Mixes
+        // 8. Mood & Genre Mixes
         processModule("tag_mixes", "Mood & Genre Mixes", "Curated playlists for every occasion", ShelfType.PLAYLIST_HORIZONTAL)
 
-        // 10. Heavy Rotation
+        // 9. Heavy Rotation
         processModule("heavy_rotation", "Heavy Rotation", "Most played on repeat", ShelfType.SONG_HORIZONTAL)
 
-        // 11. Dynamically render ALL modules listed in modules metadata
+        // 10. Dynamically render ALL modules listed in modules metadata (excluding podcasts & radio)
         if (modules != null) {
             for (key in modules.keySet()) {
                 if (!processedKeys.contains(key)) {
@@ -436,12 +456,14 @@ object HomeMapper {
                         key,
                         key.replace("_", " ").split(" ").joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
                     )
-                    processModule(key, rawTitle, "Curated music for you")
+                    if (!isExcludedModule(key, rawTitle)) {
+                        processModule(key, rawTitle, "Curated music for you")
+                    }
                 }
             }
         }
 
-        // 12. Dynamically render any additional home shelves in json root
+        // 11. Dynamically render any additional home shelves in json root (excluding podcasts & radio)
         for (key in json.keySet()) {
             if (key in listOf("modules", "global_config", "header", "footer", "status", "count", "history")) continue
             if (!processedKeys.contains(key)) {
@@ -450,7 +472,44 @@ object HomeMapper {
                     .split(" ")
                     .filter { it.isNotBlank() }
                     .joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
-                processModule(key, rawTitle, "Curated for you")
+                if (!isExcludedModule(key, rawTitle)) {
+                    processModule(key, rawTitle, "Curated for you")
+                }
+            }
+        }
+
+        // 12. Guaranteed Top Artist Profile Shelf
+        if (shelves.none { it.type == ShelfType.ARTIST_HORIZONTAL }) {
+            val topArtistNames = listOf(
+                "Arijit Singh", "Shreya Ghoshal", "Diljit Dosanjh", "Sidhu Moose Wala",
+                "Karan Aujla", "Yo Yo Honey Singh", "Neha Kakkar", "Atif Aslam",
+                "Badshah", "AP Dhillon", "A.R. Rahman", "Anirudh",
+                "Jubin Nautiyal", "B Praak", "Pritam", "Sonu Nigam",
+                "KK", "Sunidhi Chauhan", "Kishore Kumar", "Lata Mangeshkar"
+            )
+            val artistItems = topArtistNames.map { name ->
+                val dp = ArtistDpManager.getOriginalDp(name)
+                ShelfItem.ArtistItem(
+                    Artist(
+                        id = name,
+                        name = name,
+                        image = dp,
+                        role = "Artist"
+                    )
+                )
+            }
+            if (artistItems.isNotEmpty()) {
+                val insertIndex = minOf(2, shelves.size)
+                shelves.add(
+                    insertIndex,
+                    MusicShelf(
+                        id = "top_artists_curated",
+                        title = "Top Artists",
+                        subtitle = "Popular singers & performers",
+                        type = ShelfType.ARTIST_HORIZONTAL,
+                        items = artistItems
+                    )
+                )
             }
         }
 
@@ -465,10 +524,16 @@ object HomeMapper {
                 if (!elem.isJsonObject) continue
                 val item = elem.asJsonObject
                 val type = item.get("type")?.asString?.lowercase() ?: ""
+
+                // Skip podcast and radio items
+                if (type in listOf("radio", "radio_station", "station", "podcast", "podcasts", "show", "shows", "episode", "channel")) {
+                    continue
+                }
+
                 when (type) {
                     "song" -> items.add(ShelfItem.SongItem(SongMapper.map(item)))
                     "album" -> items.add(ShelfItem.AlbumItem(AlbumMapper.map(item)))
-                    "playlist", "chart", "radio", "radio_station", "channel" -> items.add(ShelfItem.PlaylistItem(PlaylistMapper.map(item)))
+                    "playlist", "chart" -> items.add(ShelfItem.PlaylistItem(PlaylistMapper.map(item)))
                     "artist" -> items.add(ShelfItem.ArtistItem(ArtistMapper.map(item)))
                     else -> {
                         if (item.has("header_desc") || item.has("listid") || item.has("list_count")) {
@@ -477,7 +542,7 @@ object HomeMapper {
                             items.add(ShelfItem.SongItem(SongMapper.map(item)))
                         } else if (item.has("artist") && item.has("year")) {
                             items.add(ShelfItem.AlbumItem(AlbumMapper.map(item)))
-                        } else if (item.has("role") || item.has("follower_count")) {
+                        } else if (item.has("role") || item.has("follower_count") || item.has("artistId")) {
                             items.add(ShelfItem.ArtistItem(ArtistMapper.map(item)))
                         } else {
                             items.add(ShelfItem.PlaylistItem(PlaylistMapper.map(item)))

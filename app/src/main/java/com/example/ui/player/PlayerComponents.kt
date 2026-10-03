@@ -133,6 +133,8 @@ data class DynamicSongColors(
     val glowAccent: Color
 )
 
+private val dynamicColorCache = androidx.collection.LruCache<String, Pair<Color, Color>>(64)
+
 @Composable
 fun rememberDynamicSongColors(
     artworkUrl: String?,
@@ -147,17 +149,26 @@ fun rememberDynamicSongColors(
         kotlin.math.abs(hash % 360).toFloat()
     }
 
-    var extractedPrimary by remember(artworkUrl) {
-        mutableStateOf<Color?>(null)
+    val cacheKey = remember(artworkUrl, isDark) { "${artworkUrl.orEmpty()}_$isDark" }
+    val initialCached = remember(cacheKey) { dynamicColorCache[cacheKey] }
+
+    var extractedPrimary by remember(cacheKey) {
+        mutableStateOf<Color?>(initialCached?.first)
     }
-    var extractedSecondary by remember(artworkUrl) {
-        mutableStateOf<Color?>(null)
+    var extractedSecondary by remember(cacheKey) {
+        mutableStateOf<Color?>(initialCached?.second)
     }
 
-    LaunchedEffect(artworkUrl) {
+    LaunchedEffect(cacheKey) {
         if (artworkUrl.isNullOrBlank()) {
             extractedPrimary = null
             extractedSecondary = null
+            return@LaunchedEffect
+        }
+
+        if (initialCached != null) {
+            extractedPrimary = initialCached.first
+            extractedSecondary = initialCached.second
             return@LaunchedEffect
         }
 
@@ -167,12 +178,13 @@ fun rememberDynamicSongColors(
                 val request = ImageRequest.Builder(context)
                     .data(artworkUrl)
                     .allowHardware(false)
+                    .size(48, 48)
                     .build()
                 val result = loader.execute(request)
                 if (result is SuccessResult) {
-                    val bitmap = result.drawable.toBitmap(96, 96, Bitmap.Config.ARGB_8888)
+                    val bitmap = result.drawable.toBitmap(32, 32, Bitmap.Config.ARGB_8888)
                     val sampledColors = mutableListOf<Int>()
-                    val step = 6
+                    val step = 4
                     for (x in 0 until bitmap.width step step) {
                         for (y in 0 until bitmap.height step step) {
                             val pixel = bitmap.getPixel(x, y)
@@ -184,13 +196,11 @@ fun rememberDynamicSongColors(
                     }
 
                     if (sampledColors.isNotEmpty()) {
-                        // Find vibrant saturated colors with balanced luminance
                         val hsv = FloatArray(3)
                         val scoredColors = sampledColors.map { c ->
                             android.graphics.Color.colorToHSV(c, hsv)
                             val saturation = hsv[1]
                             val brightness = hsv[2]
-                            // Score based on saturation and optimal Material Design luminance
                             val score = saturation * 2.5f + (if (brightness in 0.35f..0.85f) 1.2f else 0.3f)
                             c to score
                         }.sortedByDescending { it.second }
@@ -198,13 +208,18 @@ fun rememberDynamicSongColors(
                         val topColorInt = scoredColors.firstOrNull()?.first
                         val secondaryColorInt = scoredColors.drop(scoredColors.size / 3).firstOrNull()?.first
 
-                        withContext(Dispatchers.Main) {
-                            topColorInt?.let { extractedPrimary = Color(it) }
-                            secondaryColorInt?.let { extractedSecondary = Color(it) }
+                        if (topColorInt != null) {
+                            val primaryCol = Color(topColorInt)
+                            val secCol = secondaryColorInt?.let { Color(it) } ?: primaryCol
+                            dynamicColorCache.put(cacheKey, Pair(primaryCol, secCol))
+                            withContext(Dispatchers.Main) {
+                                extractedPrimary = primaryCol
+                                extractedSecondary = secCol
+                            }
                         }
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Fallback gracefully
             }
         }

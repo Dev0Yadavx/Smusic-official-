@@ -346,24 +346,6 @@ fun AlbumCard(
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface
         )
-        if (album.artist.isNotBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = album.artist,
-                fontFamily = AppFontFamily,
-                fontStyle = FontStyle.Italic,
-                fontWeight = FontWeight.Normal,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = AppFontFamily,
-                    fontStyle = FontStyle.Italic,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 11.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
     }
 }
 
@@ -373,26 +355,8 @@ fun PlaylistCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val cleanArtworks = remember(playlist.previewArtworks, playlist.artwork) {
-        buildList {
-            playlist.previewArtworks
-                .map { com.example.data.remote.JioSaavnImageResolver.resolve(it, 500).ifBlank { it } }
-                .filter { it.isNotBlank() }
-                .forEach { add(it) }
-            if (playlist.artwork.isNotBlank()) {
-                val resolved = com.example.data.remote.JioSaavnImageResolver.resolve(playlist.artwork, 500).ifBlank { playlist.artwork }
-                if (!contains(resolved)) add(0, resolved)
-            }
-        }.distinct()
-    }
-
     val displayTitle = remember(playlist.title) {
         playlist.title.trim().ifBlank { "SMusic Playlist" }
-    }
-    val displaySubtitle = remember(playlist.subtitle, playlist.songCount) {
-        playlist.subtitle.trim().ifBlank {
-            if (playlist.songCount > 0) "${playlist.songCount} Songs" else "Playlist"
-        }
     }
 
     Column(
@@ -410,43 +374,33 @@ fun PlaylistCard(
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center
         ) {
-            if (cleanArtworks.size >= 2) {
+            if (playlist.artwork.isNotBlank()) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(playlist.artwork)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = displayTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else if (playlist.previewArtworks.size >= 2) {
                 FourSongGridCover(
-                    artworks = cleanArtworks,
+                    artworks = playlist.previewArtworks,
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 18.dp,
                     fallbackTitle = displayTitle
                 )
-            } else if (cleanArtworks.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
-                        modifier = Modifier.size(42.dp)
-                    )
-                    AsyncImage(
-                        model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                            .data(cleanArtworks.first())
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = displayTitle,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+            } else if (playlist.previewArtworks.isNotEmpty()) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(playlist.previewArtworks.first())
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = displayTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
             } else {
                 Box(
                     modifier = Modifier
@@ -487,21 +441,6 @@ fun PlaylistCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 2.dp)
-        )
-
-        Spacer(modifier = Modifier.height(2.dp))
-
-        Text(
-            text = displaySubtitle,
-            fontFamily = AppFontFamily,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = AppFontFamily,
-                fontSize = 11.5.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 2.dp)
         )
     }

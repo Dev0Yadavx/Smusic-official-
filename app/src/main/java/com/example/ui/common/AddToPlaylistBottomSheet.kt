@@ -148,11 +148,10 @@ fun AddToPlaylistBottomSheet(
                             .clickable {
                                 scope.launch {
                                     repository.addSongToPlaylist(playlist.id, track)
-                                    Toast.makeText(
+                                    com.example.ui.common.AppToast.show(
                                         context,
-                                        "Added to ${playlist.name}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                        "Added to ${playlist.name}"
+                                    )
                                     onDismiss()
                                 }
                             }
@@ -221,11 +220,10 @@ fun AddToPlaylistBottomSheet(
                                     newPlaylistDesc.trim()
                                 )
                                 repository.addSongToPlaylist(newId, track)
-                                Toast.makeText(
+                                com.example.ui.common.AppToast.show(
                                     context,
-                                    "Created and added to ${newPlaylistName.trim()}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                    "Created and added to ${newPlaylistName.trim()}"
+                                )
                                 showCreateDialog = false
                                 onDismiss()
                             }

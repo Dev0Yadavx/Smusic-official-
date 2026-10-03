@@ -49,6 +49,12 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     val searchHistory: StateFlow<List<String>> = repository.searchHistory
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val exploreShelves: StateFlow<List<MusicShelf>> = repository.getHomeContent()
+        .map { result ->
+            if (result is NetworkResult.Success) result.data else emptyList()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private var debounceJob: Job? = null
 
     fun onQueryChange(newQuery: String) {

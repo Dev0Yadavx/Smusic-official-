@@ -215,23 +215,6 @@ class MusicPlaybackService : MediaSessionService() {
         serviceScope.launch {
             playerManager.isCurrentTrackLiked.collectLatest { isLiked ->
                 updateCustomHeartButton(isLiked)
-                syncMediaNotification()
-            }
-        }
-
-        // Observe track, playing state, buffering, and duration so Notification always stays in sync
-        serviceScope.launch {
-            kotlinx.coroutines.flow.combine(
-                playerManager.currentTrack,
-                playerManager.isPlaying,
-                playerManager.isBuffering,
-                playerManager.durationMs
-            ) { track, playing, buffering, _ ->
-                Triple(track, playing, buffering)
-            }.collectLatest { (track, playing, buffering) ->
-                if (track != null) {
-                    syncMediaNotification(forceForeground = playing || buffering)
-                }
             }
         }
 

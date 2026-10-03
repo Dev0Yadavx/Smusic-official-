@@ -47,11 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.example.data.model.Album
-import com.example.data.model.Artist
-import com.example.data.model.PlayableTrack
-import com.example.data.model.Playlist
-import com.example.data.model.Song
+import com.example.data.model.*
 import com.example.player.PlayerManager
 import com.example.ui.common.*
 import com.example.ui.theme.AppFontFamily
@@ -77,6 +73,92 @@ val trendingPillsRow2 = listOf(
     "Bhakti Sagar",
     "90s Classics"
 )
+
+data class ExploreGenreCard(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val searchQuery: String,
+    val gradient: List<Color>,
+    val icon: ImageVector
+)
+
+val exploreCardsList = listOf(
+    ExploreGenreCard("trending", "Trending Hits", "Top charts & viral hits", "Trending", listOf(Color(0xFFE11D48), Color(0xFFF43F5E)), Icons.Rounded.LocalFireDepartment),
+    ExploreGenreCard("bollywood", "Bollywood Central", "Hindi blockbusters", "Bollywood Hits", listOf(Color(0xFF7C3AED), Color(0xFFA855F7)), Icons.Rounded.MusicNote),
+    ExploreGenreCard("punjabi", "Punjabi Pop", "Bhangra & Pop", "Punjabi Hits", listOf(Color(0xFFEA580C), Color(0xFFF97316)), Icons.Rounded.Album),
+    ExploreGenreCard("romantic", "Romantic Songs", "Love & Melodies", "Romantic Songs", listOf(Color(0xFFDB2777), Color(0xFFF472B6)), Icons.Rounded.Favorite),
+    ExploreGenreCard("lofi", "Lo-Fi & Chill", "Study, focus & relax", "Lofi Chill", listOf(Color(0xFF0D9488), Color(0xFF2DD4BF)), Icons.Rounded.NightsStay),
+    ExploreGenreCard("devotional", "Bhakti & Spiritual", "Aarti & Bhajans", "Bhakti", listOf(Color(0xFFD97706), Color(0xFFFBBF24)), Icons.Rounded.Spa),
+    ExploreGenreCard("party", "Party & Dance", "EDM & Club bangers", "Party Dance", listOf(Color(0xFF9333EA), Color(0xFFC084FC)), Icons.Rounded.Celebration),
+    ExploreGenreCard("classics", "90s Golden Era", "Evergreen melodies", "90s Bollywood", listOf(Color(0xFF4F46E5), Color(0xFF818CF8)), Icons.Rounded.Radio),
+    ExploreGenreCard("indie", "Indie Music", "Fresh indie sounds", "Indie India", listOf(Color(0xFF059669), Color(0xFF34D399)), Icons.Rounded.Audiotrack),
+    ExploreGenreCard("workout", "Gym & Workout", "High energy beats", "Workout Gym", listOf(Color(0xFFDC2626), Color(0xFFEF4444)), Icons.Rounded.FitnessCenter),
+    ExploreGenreCard("english", "International Pop", "Global Billboard hits", "English Pop", listOf(Color(0xFF0284C7), Color(0xFF38BDF8)), Icons.Rounded.Headphones),
+    ExploreGenreCard("arijit", "Arijit Singh Hits", "Soulful tracks", "Arijit Singh", listOf(Color(0xFF2563EB), Color(0xFF60A5FA)), Icons.Rounded.Person)
+)
+
+@Composable
+fun ExploreCardItem(
+    card: ExploreGenreCard,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.Transparent,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(94.dp)
+            .testTag("explore_card_${card.id}")
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.horizontalGradient(card.gradient))
+                .padding(14.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(end = 36.dp)
+            ) {
+                Text(
+                    text = card.title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 15.sp
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = card.subtitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 11.sp
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Icon(
+                imageVector = card.icon,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.28f),
+                modifier = Modifier
+                    .size(52.dp)
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 6.dp, y = 6.dp)
+                    .rotate(-15f)
+            )
+        }
+    }
+}
 
 @Composable
 fun TrendingPillChip(
@@ -152,6 +234,7 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val suggestions by viewModel.autocompleteSuggestions.collectAsStateWithLifecycle()
     val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
+    val exploreShelves by viewModel.exploreShelves.collectAsStateWithLifecycle()
     val currentTrack by playerManager.currentTrack.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
@@ -254,10 +337,12 @@ fun SearchScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(
@@ -281,7 +366,7 @@ fun SearchScreen(
                     Column {
                         Spacer(modifier = Modifier.height(6.dp))
                         val tabs = listOf(
-                            SearchTab.ALL to "All Songs",
+                            SearchTab.ALL to "All",
                             SearchTab.ARTISTS to "Artists",
                             SearchTab.ALBUMS to "Albums",
                             SearchTab.PLAYLISTS to "Playlists"
@@ -299,19 +384,12 @@ fun SearchScreen(
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = { viewModel.setTab(tab) },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = getTabIcon(tab),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                    },
                                     label = {
                                         Text(
                                             text = labelText,
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                fontSize = 11.5.sp
+                                                fontSize = 12.sp
                                             )
                                         )
                                     },
@@ -319,12 +397,14 @@ fun SearchScreen(
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
-                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        labelColor = MaterialTheme.colorScheme.onSurface
                                     ),
-                                    border = null,
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = isSelected,
+                                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                    ),
                                     modifier = Modifier
                                         .height(30.dp)
                                         .padding(end = 6.dp)

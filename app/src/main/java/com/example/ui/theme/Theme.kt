@@ -32,11 +32,11 @@ fun buildExpressiveDarkColorScheme(
         primary = prim,
         onPrimary = onPrim,
         primaryContainer = surfVar,
-        onPrimaryContainer = prim,
+        onPrimaryContainer = Color.White,
         secondary = sec,
         onSecondary = onSec,
         secondaryContainer = surfCard,
-        onSecondaryContainer = sec,
+        onSecondaryContainer = Color.White,
         tertiary = accent.tertiary,
         onTertiary = Color.White,
         background = bg,
@@ -45,6 +45,9 @@ fun buildExpressiveDarkColorScheme(
         onSurface = PixelTextPrimary,
         surfaceVariant = surfVar,
         onSurfaceVariant = PixelTextSecondary,
+        surfaceContainer = surfCard,
+        surfaceContainerHigh = surfCard,
+        surfaceContainerHighest = surfVar,
         outline = Color(0xFF2E384D),
         error = Color(0xFFF87171),
         onError = Color.White
@@ -67,19 +70,22 @@ fun buildExpressiveLightColorScheme(
         primary = prim,
         onPrimary = onPrim,
         primaryContainer = Color(0xFFF3E8FF),
-        onPrimaryContainer = prim,
+        onPrimaryContainer = PixelLightPrimary,
         secondary = sec,
         onSecondary = onSec,
-        secondaryContainer = PixelLightSurfaceCard,
-        onSecondaryContainer = Color(0xFF1E293B),
+        secondaryContainer = Color.White,
+        onSecondaryContainer = PixelLightTextPrimary,
         tertiary = accent.tertiary,
         onTertiary = Color.White,
         background = PixelLightBackground,
         onBackground = PixelLightTextPrimary,
-        surface = PixelLightSurface,
+        surface = Color.White,
         onSurface = PixelLightTextPrimary,
-        surfaceVariant = PixelLightSurfaceVariant,
+        surfaceVariant = Color(0xFFF1F5F9),
         onSurfaceVariant = PixelLightTextSecondary,
+        surfaceContainer = Color.White,
+        surfaceContainerHigh = Color.White,
+        surfaceContainerHighest = Color.White,
         outline = Color(0xFFCBD5E1),
         error = Color(0xFFDC2626),
         onError = Color.White
@@ -198,14 +204,31 @@ fun SMusicTheme(
         }
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val baseScheme = if (isDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            if (isDarkTheme && isAmoledBlack) {
-                baseScheme.copy(
-                    background = AmoledDarkBackground,
-                    surface = AmoledDarkSurface,
-                    surfaceVariant = AmoledDarkSurfaceVariant
-                )
+            if (isDarkTheme) {
+                if (isAmoledBlack) {
+                    baseScheme.copy(
+                        background = AmoledDarkBackground,
+                        surface = AmoledDarkSurface,
+                        surfaceVariant = AmoledDarkSurfaceVariant,
+                        onSurface = Color.White,
+                        onSurfaceVariant = Color(0xFFCBD5E1)
+                    )
+                } else {
+                    baseScheme.copy(
+                        onSurface = Color.White,
+                        onSurfaceVariant = Color(0xFFCBD5E1)
+                    )
+                }
             } else {
-                baseScheme
+                baseScheme.copy(
+                    surface = Color.White,
+                    surfaceContainer = Color.White,
+                    surfaceContainerHigh = Color.White,
+                    surfaceContainerHighest = Color.White,
+                    secondaryContainer = Color.White,
+                    onSurface = PixelLightTextPrimary,
+                    onSurfaceVariant = PixelLightTextSecondary
+                )
             }
         }
         isDarkTheme -> buildExpressiveDarkColorScheme(accentPalette, isAmoledBlack)

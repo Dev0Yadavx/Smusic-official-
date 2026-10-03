@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
@@ -170,16 +171,42 @@ class MainActivity : ComponentActivity() {
                     playerManager.ensureServiceStarted()
                 }
 
-                var currentRootScreen by remember { mutableStateOf(RootScreen.HOME) }
-                var currentSubScreen by remember { mutableStateOf<SubScreen>(SubScreen.None) }
+                val rootStack = remember { mutableStateListOf(RootScreen.HOME) }
+                val subStack = remember { mutableStateListOf<SubScreen>() }
                 var isNowPlayingOpen by remember { mutableStateOf(false) }
 
-                // Intercept back button when Now Playing or Subscreen is open
-                BackHandler(enabled = isNowPlayingOpen || currentSubScreen !is SubScreen.None) {
-                    if (isNowPlayingOpen) {
-                        isNowPlayingOpen = false
-                    } else if (currentSubScreen !is SubScreen.None) {
-                        currentSubScreen = SubScreen.None
+                val currentRootScreen = rootStack.lastOrNull() ?: RootScreen.HOME
+                val currentSubScreen = subStack.lastOrNull() ?: SubScreen.None
+
+                fun pushSubScreen(sub: SubScreen) {
+                    subStack.add(sub)
+                }
+
+                fun popSubScreen() {
+                    if (subStack.isNotEmpty()) {
+                        subStack.removeAt(subStack.lastIndex)
+                    }
+                }
+
+                fun pushRootScreen(root: RootScreen) {
+                    if (rootStack.lastOrNull() != root) {
+                        rootStack.add(root)
+                    }
+                    subStack.clear()
+                }
+
+                // Intercept back button step by step (no direct exit to Home)
+                BackHandler(enabled = isNowPlayingOpen || subStack.isNotEmpty() || rootStack.size > 1) {
+                    when {
+                        isNowPlayingOpen -> {
+                            isNowPlayingOpen = false
+                        }
+                        subStack.isNotEmpty() -> {
+                            subStack.removeAt(subStack.lastIndex)
+                        }
+                        rootStack.size > 1 -> {
+                            rootStack.removeAt(rootStack.lastIndex)
+                        }
                     }
                 }
 
@@ -199,7 +226,7 @@ class MainActivity : ComponentActivity() {
                                             repository = repository,
                                             playerManager = playerManager,
                                             themeManager = themeManager,
-                                            onBack = { currentSubScreen = SubScreen.None }
+                                            onBack = { popSubScreen() }
                                         )
                                     }
                                     is SubScreen.AlbumDetail -> {
@@ -210,7 +237,7 @@ class MainActivity : ComponentActivity() {
                                             initialArtwork = sub.artwork,
                                             repository = repository,
                                             playerManager = playerManager,
-                                            onBack = { currentSubScreen = SubScreen.None }
+                                            onBack = { popSubScreen() }
                                         )
                                     }
                                     is SubScreen.PlaylistDetail -> {
@@ -218,7 +245,7 @@ class MainActivity : ComponentActivity() {
                                             playlistId = sub.id,
                                             repository = repository,
                                             playerManager = playerManager,
-                                            onBack = { currentSubScreen = SubScreen.None }
+                                            onBack = { popSubScreen() }
                                         )
                                     }
                                     is SubScreen.ArtistDetail -> {
@@ -227,9 +254,9 @@ class MainActivity : ComponentActivity() {
                                             repository = repository,
                                             playerManager = playerManager,
                                             onNavigateToAlbum = { albumId -> 
-                                                currentSubScreen = SubScreen.AlbumDetail(id = albumId) 
+                                                pushSubScreen(SubScreen.AlbumDetail(id = albumId))
                                             },
-                                            onBack = { currentSubScreen = SubScreen.None }
+                                            onBack = { popSubScreen() }
                                         )
                                     }
                                     SubScreen.None -> {
@@ -238,18 +265,20 @@ class MainActivity : ComponentActivity() {
                                                 HomeScreen(
                                                     viewModel = homeViewModel,
                                                     playerManager = playerManager,
-                                                    onNavigateToSearch = { currentRootScreen = RootScreen.SEARCH },
-                                                    onNavigateToSettings = { currentSubScreen = SubScreen.Settings },
+                                                    onNavigateToSearch = { pushRootScreen(RootScreen.SEARCH) },
+                                                    onNavigateToSettings = { pushSubScreen(SubScreen.Settings) },
                                                     onNavigateToAlbum = { album ->
-                                                        currentSubScreen = SubScreen.AlbumDetail(
-                                                            id = album.id,
-                                                            title = album.title,
-                                                            artist = album.artist,
-                                                            artwork = album.artwork
+                                                        pushSubScreen(
+                                                            SubScreen.AlbumDetail(
+                                                                id = album.id,
+                                                                title = album.title,
+                                                                artist = album.artist,
+                                                                artwork = album.artwork
+                                                            )
                                                         )
                                                     },
-                                                    onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) },
-                                                    onNavigateToArtist = { currentSubScreen = SubScreen.ArtistDetail(it) }
+                                                    onNavigateToPlaylist = { pushSubScreen(SubScreen.PlaylistDetail(it)) },
+                                                    onNavigateToArtist = { pushSubScreen(SubScreen.ArtistDetail(it)) }
                                                 )
                                             }
                                             RootScreen.SEARCH -> {
@@ -257,22 +286,24 @@ class MainActivity : ComponentActivity() {
                                                     viewModel = searchViewModel,
                                                     playerManager = playerManager,
                                                     onNavigateToAlbum = { album ->
-                                                        currentSubScreen = SubScreen.AlbumDetail(
-                                                            id = album.id,
-                                                            title = album.title,
-                                                            artist = album.artist,
-                                                            artwork = album.artwork
+                                                        pushSubScreen(
+                                                            SubScreen.AlbumDetail(
+                                                                id = album.id,
+                                                                title = album.title,
+                                                                artist = album.artist,
+                                                                artwork = album.artwork
+                                                            )
                                                         )
                                                     },
-                                                    onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) },
-                                                    onNavigateToArtist = { currentSubScreen = SubScreen.ArtistDetail(it) }
+                                                    onNavigateToPlaylist = { pushSubScreen(SubScreen.PlaylistDetail(it)) },
+                                                    onNavigateToArtist = { pushSubScreen(SubScreen.ArtistDetail(it)) }
                                                 )
                                             }
                                             RootScreen.LIBRARY -> {
                                                 LibraryScreen(
                                                     viewModel = libraryViewModel,
                                                     playerManager = playerManager,
-                                                    onNavigateToPlaylist = { currentSubScreen = SubScreen.PlaylistDetail(it) }
+                                                    onNavigateToPlaylist = { pushSubScreen(SubScreen.PlaylistDetail(it)) }
                                                 )
                                             }
                                         }
@@ -324,10 +355,70 @@ class MainActivity : ComponentActivity() {
                                 currentRootScreen = currentRootScreen,
                                 isSubScreenOpen = currentSubScreen !is SubScreen.None,
                                 onSelectTab = { screen ->
-                                    currentRootScreen = screen
-                                    currentSubScreen = SubScreen.None
+                                    pushRootScreen(screen)
                                 }
                             )
+                        }
+                    }
+
+                    // Floating Rounded Pill Toast Overlay
+                    val currentToastData by com.example.ui.common.AppToastManager.currentToast.collectAsState()
+
+                    LaunchedEffect(currentToastData) {
+                        if (currentToastData != null) {
+                            kotlinx.coroutines.delay(2800)
+                            com.example.ui.common.AppToastManager.dismiss()
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = currentToastData != null,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 100.dp)
+                            .zIndex(100f)
+                    ) {
+                        currentToastData?.let { toast ->
+                            Surface(
+                                shape = RoundedCornerShape(28.dp),
+                                color = Color(0xFF1E1F28),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
+                                shadowElevation = 12.dp,
+                                modifier = Modifier
+                                    .padding(horizontal = 24.dp)
+                                    .clickable { com.example.ui.common.AppToastManager.dismiss() }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (toast.isDownload) Icons.Rounded.DownloadDone else Icons.Rounded.CheckCircle,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = toast.message,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            fontSize = 13.5.sp
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -344,11 +435,11 @@ class MainActivity : ComponentActivity() {
                             onDismiss = { isNowPlayingOpen = false },
                             onViewAlbum = { albumId ->
                                 isNowPlayingOpen = false
-                                currentSubScreen = SubScreen.AlbumDetail(albumId)
+                                pushSubScreen(SubScreen.AlbumDetail(albumId))
                             },
                             onViewArtist = { artistId ->
                                 isNowPlayingOpen = false
-                                currentSubScreen = SubScreen.ArtistDetail(artistId)
+                                pushSubScreen(SubScreen.ArtistDetail(artistId))
                             }
                         )
                     }

@@ -193,13 +193,13 @@ fun TrackOptionsBottomSheet(
                     onClick = {
                         if (isDownloading) {
                             downloadManager.cancelDownload(track.id)
-                            android.widget.Toast.makeText(context, "Download cancelled", android.widget.Toast.LENGTH_SHORT).show()
+                            com.example.ui.common.AppToast.show(context, "Download cancelled", isDownload = true)
                         } else if (isDownloaded) {
                             downloadManager.deleteDownloadedSong(track.id)
-                            android.widget.Toast.makeText(context, "Removed from downloads", android.widget.Toast.LENGTH_SHORT).show()
+                            com.example.ui.common.AppToast.show(context, "Removed from downloads", isDownload = true)
                         } else {
                             downloadManager.startDownload(track, "320")
-                            android.widget.Toast.makeText(context, "Download started for ${track.title}", android.widget.Toast.LENGTH_SHORT).show()
+                            com.example.ui.common.AppToast.show(context, "Download started for ${track.title}", isDownload = true)
                         }
                         onDismiss()
                     },

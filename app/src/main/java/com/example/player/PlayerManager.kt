@@ -322,7 +322,6 @@ class PlayerManager private constructor(private val appContext: Context) {
     private fun invalidateSessionState() {
         val notifyAction = {
             sessionPlayer.notifyStateChanged()
-            (serviceContext as? MusicPlaybackService)?.syncMediaNotification()
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
             notifyAction()
@@ -884,19 +883,19 @@ class PlayerManager private constructor(private val appContext: Context) {
     private suspend fun loadArtworkBytes(artworkUrlOrPath: String): ByteArray? = withContext(Dispatchers.IO) {
         if (artworkUrlOrPath.isBlank()) return@withContext null
         try {
-            val resolvedUrl = com.example.data.remote.JioSaavnImageResolver.resolve(artworkUrlOrPath, 500)
+            val resolvedUrl = com.example.data.remote.JioSaavnImageResolver.resolve(artworkUrlOrPath, 250)
                 .ifBlank { artworkUrlOrPath }
             val request = ImageRequest.Builder(appContext)
                 .data(resolvedUrl)
-                .size(512, 512)
+                .size(256, 256)
                 .allowHardware(false)
                 .build()
             val result = imageLoader.execute(request)
             val drawable = result.drawable
-            if (drawable is BitmapDrawable) {
+            if (drawable is BitmapDrawable && drawable.bitmap != null) {
                 val bitmap = drawable.bitmap
                 val stream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 75, stream)
                 return@withContext stream.toByteArray()
             }
         } catch (e: Exception) {

@@ -1,11 +1,13 @@
 package com.example.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +69,10 @@ fun HomeScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val currentPlayingTrack by playerManager.currentTrack.collectAsStateWithLifecycle()
     val pullRefreshState = rememberPullToRefreshState()
+    val homeListState = rememberLazyListState()
+    val isScrolled by remember {
+        derivedStateOf { homeListState.firstVisibleItemIndex > 0 || homeListState.firstVisibleItemScrollOffset > 10 }
+    }
 
     var selectedTrackForOptions by remember { mutableStateOf<PlayableTrack?>(null) }
     var isTrackLiked by remember { mutableStateOf(false) }
@@ -163,8 +169,9 @@ fun HomeScreen(
             }
             is HomeUiState.Success -> {
                 LazyColumn(
+                    state = homeListState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 150.dp, bottom = 165.dp)
+                    contentPadding = PaddingValues(top = 158.dp, bottom = 165.dp)
                 ) {
                     items(state.shelves, key = { it.id }) { shelf ->
                         HomeShelfSection(
@@ -191,26 +198,27 @@ fun HomeScreen(
             }
         }
 
-        // Fixed Sticky Header
+        // Fixed Sticky Header with Large M3 Bottom Rounding
         val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-        Column(
+        Surface(
+            shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
+            color = if (isDark) MaterialTheme.colorScheme.surface.copy(alpha = if (isScrolled) 0.95f else 0.90f) else Color.White,
+            tonalElevation = if (isScrolled) 6.dp else 1.dp,
+            shadowElevation = if (isScrolled) 8.dp else 2.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (isDark) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f)
+            ),
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to MaterialTheme.colorScheme.background.copy(alpha = if (isDark) 0.85f else 0.90f),
-                        0.70f to MaterialTheme.colorScheme.background.copy(alpha = if (isDark) 0.50f else 0.55f),
-                        1.0f to Color.Transparent
-                    )
-                )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -238,20 +246,20 @@ fun HomeScreen(
                             )
                         )
 
-                        // Greeting Pill with Avatar (Nickname displayed down for clean long names)
+                        // Greeting Pill with Avatar
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(
-                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.72f)
-                                    else Color.White.copy(alpha = 0.88f)
+                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.85f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
                                 )
                                 .border(
                                     1.dp,
                                     if (isDark) Color.White.copy(alpha = 0.16f)
-                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
                                     RoundedCornerShape(20.dp)
                                 )
                                 .clickable { showProfileDialog = true }
@@ -299,13 +307,13 @@ fun HomeScreen(
                                 .size(42.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.72f)
-                                    else Color.White.copy(alpha = 0.88f)
+                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.85f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
                                 )
                                 .border(
                                     1.dp,
                                     if (isDark) Color.White.copy(alpha = 0.16f)
-                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
                                     CircleShape
                                 )
                                 .testTag("home_search_button")
@@ -324,13 +332,13 @@ fun HomeScreen(
                                 .size(42.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.72f)
-                                    else Color.White.copy(alpha = 0.88f)
+                                    if (isDark) Color(0xFF1B1B24).copy(alpha = 0.85f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
                                 )
                                 .border(
                                     1.dp,
                                     if (isDark) Color.White.copy(alpha = 0.16f)
-                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
                                     CircleShape
                                 )
                                 .testTag("home_settings_button")
@@ -340,42 +348,6 @@ fun HomeScreen(
                                 contentDescription = "Settings",
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Category & Language Filter Chips
-                val currentCategory by viewModel.selectedLanguage.collectAsStateWithLifecycle()
-                val categories = listOf("All", "Hindi", "Punjabi", "English", "Bhojpuri", "Haryanvi")
-
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(categories) { category ->
-                        val isSelected = currentCategory.equals(category, ignoreCase = true)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.60f else 0.85f),
-                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                            border = if (!isSelected) androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                            ) else null,
-                            modifier = Modifier
-                                .clickable { viewModel.selectLanguage(category) }
-                                .testTag("category_chip_$category")
-                        ) {
-                            Text(
-                                text = category,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                                    fontSize = 12.5.sp
-                                ),
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                             )
                         }
                     }
@@ -447,65 +419,61 @@ fun HomeShelfSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = shelf.title,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 22.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (shelf.subtitle.isNotBlank()) {
-                    Text(
-                        text = shelf.subtitle,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            Text(
+                text = shelf.title,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 22.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         when (shelf.type) {
             ShelfType.SONG_HORIZONTAL -> {
-                val songs = shelf.items.mapNotNull { if (it is ShelfItem.SongItem) it.song else null }
-                val chunks = songs.chunked(4)
+                val songs = remember(shelf) {
+                    shelf.items.mapNotNull { if (it is ShelfItem.SongItem) it.song else null }
+                }
+                val chunks = remember(songs) {
+                    songs.chunked(4)
+                }
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(chunks) { colSongs ->
+                    items(chunks, key = { chunk -> "col_${shelf.id}_${chunk.firstOrNull()?.id ?: chunk.hashCode()}" }) { colSongs ->
                         Column(
                             modifier = Modifier.width(300.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             colSongs.forEach { song ->
-                                QuickPickRowItem(
-                                    song = song,
-                                    isPlaying = currentPlayingId == song.id,
-                                    onClick = { onPlaySong(song, songs) },
-                                    onMoreClick = { onMoreSong(song) }
-                                )
+                                key(song.id) {
+                                    QuickPickRowItem(
+                                        song = song,
+                                        isPlaying = currentPlayingId == song.id,
+                                        onClick = { onPlaySong(song, songs) },
+                                        onMoreClick = { onMoreSong(song) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
             ShelfType.ARTIST_HORIZONTAL -> {
-                val artists = shelf.items.mapNotNull { if (it is ShelfItem.ArtistItem) it.artist else null }
+                val artists = remember(shelf) {
+                    shelf.items.mapNotNull { if (it is ShelfItem.ArtistItem) it.artist else null }
+                }
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(artists, key = { it.id }) { artist ->
+                    items(artists, key = { "art_${shelf.id}_${it.id}" }) { artist ->
                         ArtistCard(
                             artist = artist,
                             onClick = { onArtistClick(artist) }
@@ -514,12 +482,14 @@ fun HomeShelfSection(
                 }
             }
             ShelfType.ALBUM_HORIZONTAL -> {
-                val albums = shelf.items.mapNotNull { if (it is ShelfItem.AlbumItem) it.album else null }
+                val albums = remember(shelf) {
+                    shelf.items.mapNotNull { if (it is ShelfItem.AlbumItem) it.album else null }
+                }
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(albums, key = { it.id }) { album ->
+                    items(albums, key = { "alb_${shelf.id}_${it.id}" }) { album ->
                         AlbumCard(
                             album = album,
                             onClick = { onAlbumClick(album) }
@@ -528,12 +498,14 @@ fun HomeShelfSection(
                 }
             }
             ShelfType.PLAYLIST_HORIZONTAL -> {
-                val playlists = shelf.items.mapNotNull { if (it is ShelfItem.PlaylistItem) it.playlist else null }
+                val playlists = remember(shelf) {
+                    shelf.items.mapNotNull { if (it is ShelfItem.PlaylistItem) it.playlist else null }
+                }
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(playlists, key = { it.id }) { playlist ->
+                    items(playlists, key = { "pl_${shelf.id}_${it.id}" }) { playlist ->
                         PlaylistCard(
                             playlist = playlist,
                             onClick = { onPlaylistClick(playlist) }
@@ -546,7 +518,14 @@ fun HomeShelfSection(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(shelf.items) { item ->
+                    items(shelf.items, key = { item ->
+                        when (item) {
+                            is ShelfItem.SongItem -> "s_${shelf.id}_${item.song.id}"
+                            is ShelfItem.AlbumItem -> "a_${shelf.id}_${item.album.id}"
+                            is ShelfItem.PlaylistItem -> "p_${shelf.id}_${item.playlist.id}"
+                            is ShelfItem.ArtistItem -> "ar_${shelf.id}_${item.artist.id}"
+                        }
+                    }) { item ->
                         when (item) {
                             is ShelfItem.SongItem -> {
                                 AlbumCard(

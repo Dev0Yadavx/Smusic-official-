@@ -269,7 +269,7 @@ class SongDownloadManager private constructor(private val context: Context) {
                 )
 
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Downloaded: ${track.title}", Toast.LENGTH_SHORT).show()
+                    com.example.ui.common.AppToast.show(context, "Downloaded: ${track.title}", isDownload = true)
                 }
 
                 // Remove from active tasks after 3 seconds
@@ -292,7 +292,7 @@ class SongDownloadManager private constructor(private val context: Context) {
                 )
                 downloadedDao.updateProgress(track.id, 0, "FAILED")
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Failed to download ${track.title}", Toast.LENGTH_SHORT).show()
+                    com.example.ui.common.AppToast.show(context, "Failed to download ${track.title}", isDownload = true)
                 }
             } finally {
                 runningJobs.remove(track.id)
@@ -365,7 +365,7 @@ class SongDownloadManager private constructor(private val context: Context) {
                     }
                     downloadedDao.deleteDownloadedSong(songId)
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Removed from Downloads", Toast.LENGTH_SHORT).show()
+                        com.example.ui.common.AppToast.show(context, "Removed from Downloads", isDownload = true)
                     }
                 }
             } catch (e: Exception) {

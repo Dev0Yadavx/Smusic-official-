@@ -150,7 +150,7 @@ fun UserProfileM3CardDialog(
         Card(
             shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                containerColor = MaterialTheme.colorScheme.surface
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
             border = BorderStroke(
